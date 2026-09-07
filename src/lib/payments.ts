@@ -78,22 +78,56 @@ const mockProvider: PaymentProvider = {
 
   async verifyPayment(orderRef) {
     const session = pendingMock.get(orderRef);
-    if (!session) {
+    if (session) {
       return {
-        successful: false,
+        successful: true,
         providerRef: `mock_${orderRef}`,
         channel: "MOCK",
-        amountPesewas: 0,
-        currency: "GHS",
-        failureReason: "Unknown or expired mock transaction.",
+        amountPesewas: session.amountPesewas,
+        currency: session.currency,
       };
     }
+
+    // Serverless-safe fallback: pendingMock lives in one request
+    // instance, but order creation and verification can hit different
+    // lambdas on serverless hosts. The mock gateway already persists a
+    // `payment.success` webhook event for this reference before
+    // fulfillment runs — that row is a durable, cross-instance
+    // acknowledgement that the student approved, so treat it as
+    // verified (the amount still comes from our own Payment record).
+    const [payment, events] = await Promise.all([
+      prisma.payment.findFirst({
+        where: { reference: orderRef },
+        select: { amountPesewas: true, currency: true },
+      }),
+      prisma.webhookEvent.findMany({
+        where: { provider: "mock", type: "payment.success" },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        select: { payload: true },
+      }),
+    ]);
+    const acknowledged = events.some((e) => {
+      const p = e.payload as { reference?: unknown } | null;
+      return typeof p?.reference === "string" && p.reference === orderRef;
+    });
+    if (payment && acknowledged) {
+      return {
+        successful: true,
+        providerRef: `mock_${orderRef}`,
+        channel: "MOCK",
+        amountPesewas: payment.amountPesewas,
+        currency: payment.currency,
+      };
+    }
+
     return {
-      successful: true,
+      successful: false,
       providerRef: `mock_${orderRef}`,
       channel: "MOCK",
-      amountPesewas: session.amountPesewas,
-      currency: session.currency,
+      amountPesewas: 0,
+      currency: "GHS",
+      failureReason: "Unknown or expired mock transaction.",
     };
   },
 };

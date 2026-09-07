@@ -16,6 +16,59 @@ abstraction, entitlements, a secure viewer shell, admin, and the PWA base.
 - **Payment abstraction layer** with a built-in sandbox gateway (real
   providers like Paystack plug into the same interface)
 
+## Demo deployment (Vercel + Neon + R2)
+
+The cheapest way to hand someone a working link: **Vercel** (free Hobby
+plan) runs the Next.js app, **Neon** (free) is the Postgres, and
+**Cloudflare R2** (free, S3-compatible) holds the private PDFs. The repo
+is structured for exactly this — set the env vars below and deploy.
+
+1. Push this repo to GitHub, then at vercel.com → **Add New Project** →
+   import it. Framework auto-detects as Next.js; leave defaults.
+2. Add the environment variables (Project Settings → Environment
+   Variables) — copy values from `.env.example`:
+
+   | Variable | Value for the demo |
+   | --- | --- |
+   | `DATABASE_URL` | your Neon connection string (`?sslmode=require`) |
+   | `S3_ENDPOINT` | `https://<account-id>.r2.cloudflarestorage.com` |
+   | `S3_REGION` | `auto` |
+   | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | R2 API token (Object Read & Write) |
+   | `S3_BUCKET` | `pastq-private` — **create this bucket first** in the R2 dashboard |
+   | `APP_ORIGIN` | `https://<your-app>.vercel.app` (no trailing slash) |
+   | `PAGE_TOKEN_SECRET` | a long random string (`openssl rand -hex 32`) |
+   | `PAYMENT_PROVIDER` | leave unset / `mock` — sandbox checkout, no keys |
+
+3. Deploy. Then run the one-time data setup **once**, with a `.env` file
+   pointing `DATABASE_URL` at the Neon database (never commit it):
+
+   ```bash
+   npx prisma migrate deploy   # create the schema on the hosted DB
+   npm run db:seed             # demo accounts + courses
+   npx tsx --env-file=.env scripts/prepare-demo.ts
+   ```
+
+   `prepare-demo.ts` hides the seeded placeholder bundles (they have no
+   PDF behind them), publishes one fully working demo bundle of sample
+   papers through the real upload pipeline, and books a **paid** demo
+   order for the student — so the link works end-to-end on first load.
+4. Share `https://<your-app>.vercel.app`:
+
+   | Role | Email | Password |
+   | --- | --- | --- |
+   | Admin | `admin@pastq.test` | `Admin@12345` |
+   | Student | `student@pastq.test` | `Student@123` |
+
+   Student demo path: **My Library** → open a paper → the secure viewer.
+   Checkout uses the sandbox gateway — approve on the mock page and the
+   order is fulfilled (server-side verification, entitlement grant).
+
+Notes: the upload/viewer pipeline uses native packages (`pdfjs-dist`,
+`@napi-rs/canvas`, `pdf-lib`) that run on Vercel's Node functions; the
+first request after a cold start is slower. The sandbox mock gateway is
+serverless-safe (its success state is persisted in the DB). When real
+providers sign webhooks, set `PAYMENT_WEBHOOK_SECRET`.
+
 ## Getting started
 
 Requires Node 20+. No Docker — Postgres and MinIO run as portable,
@@ -49,7 +102,7 @@ Stop everything with `npm run services:down`; check state with
 
 ### Buying something (sandbox)
 
-Log in as the student → open any resource → **Buy Now** → the sandbox
+Log in as the student → open any bundle → **Buy Now** → the sandbox
 "Mobile Money" page lets you approve, fail, or cancel. Approving fires a signed
 webhook → server-side verification → entitlement grant → the resource appears
 in **My Library** → open the secure viewer.
@@ -86,11 +139,9 @@ public/sw.js              # PWA service worker (offline shell)
 
 ## Roadmap (from the spec)
 
-1. **Next:** resource upload (admin) → storage + page-rendering pipeline →
-   real page rendering in the viewer (server-rasterized pages with burned-in
-   watermarks), replace the sandbox gateway with a real provider (Paystack).
-2. Then: PWA caching sprint, offline reading, favourites, reviews, coupons.
-3. Later: multi-seller marketplace (spec §41), native apps (spec §40).
+1. **Next:** replace the sandbox gateway with a real provider (Paystack),
+   PWA caching sprint + offline reading, favourites, reviews, coupons.
+2. Later: multi-seller marketplace (spec §41), native apps (spec §40).
 
 ## Conventions
 
