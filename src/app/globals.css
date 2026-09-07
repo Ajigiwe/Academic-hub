@@ -1,23 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-  /* Brand — deep academic green, gold accent */
-  --color-brand-50: #ecfdf3;
-  --color-brand-100: #d1fadf;
-  --color-brand-200: #a6f4c5;
-  --color-brand-300: #6ce9a6;
-  --color-brand-400: #32d583;
-  --color-brand-500: #12b76a;
-  --color-brand-600: #039855;
-  --color-brand-700: #027a48;
-  --color-brand-800: #054f31;
-  --color-brand-900: #03301e;
-  --color-brand-950: #022015;
+  /* Brand — deep navy primary (#0b2d5b), bright blue accent (#2563eb) */
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dbe7fe;
+  --color-brand-200: #bfd4fe;
+  --color-brand-300: #93b4fd;
+  --color-brand-400: #608afa;
+  --color-brand-500: #3b6df6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #173aa8;
+  --color-brand-900: #12296b;
+  --color-brand-950: #0b2d5b;
 
-  --color-gold-300: #fec84b;
-  --color-gold-400: #fdb022;
-  --color-gold-500: #f79009;
-  --color-gold-600: #dc6803;
+  /* Gold tokens re-mapped to the blue accent family for the new brand */
+  --color-gold-300: #93b4fd;
+  --color-gold-400: #608afa;
+  --color-gold-500: #3b6df6;
+  --color-gold-600: #1d4ed8;
 
   --shadow-soft: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
   --shadow-card: 0 2px 4px -2px rgb(16 24 40 / 0.06), 0 4px 8px -2px rgb(16 24 40 / 0.08);

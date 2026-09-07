@@ -16,15 +16,23 @@ export const metadata: Metadata = {
   description:
     "Ghana's digital academic library. Find, purchase, and study past questions and academic resources — Learn · Revise · Excel.",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: appName,
+    title: "Academic Hub",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#027a48",
+  themeColor: "#0b2d5b",
   width: "device-width",
   initialScale: 1,
 };

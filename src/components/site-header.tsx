@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { SessionUser } from "@/lib/auth";
 import { LogoutButton } from "./logout-button";
+import { Logo } from "./logo";
 
 const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "Academic Resource Hub";
 
@@ -21,29 +22,11 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
         inAdmin ? "hidden" : ""
       }`}
     >
-      {/* Gold accent line — brand signature */}
-      <div className="h-0.5 w-full bg-gradient-to-r from-brand-700 via-gold-400 to-brand-700" />
+      {/* Brand accent line */}
+      <div className="h-0.5 w-full bg-gradient-to-r from-brand-700 via-gold-400 to-brand-950" />
       <div className="container-page flex h-16 items-center justify-between gap-4">
-        <Link href="/" className="group flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-brand-700 to-brand-900 text-sm font-bold text-white shadow-soft transition-shadow group-hover:shadow-card">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M4 19.5V6a2 2 0 0 1 2-2h14v14H6.5a2.5 2.5 0 0 0 0 5H20"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </span>
-          <span className="hidden flex-col leading-tight sm:flex">
-            <span className="text-[15px] font-bold tracking-tight text-neutral-900">
-              Academic Resource Hub
-            </span>
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-600">
-              Learn · Revise · Excel
-            </span>
-          </span>
+        <Link href="/" className="group">
+          <Logo tagline className="transition-opacity group-hover:opacity-80" />
         </Link>
 
         {/* Desktop nav */}

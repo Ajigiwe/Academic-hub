@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { LogoutButton } from "@/components/logout-button";
+import { Logo } from "@/components/logo";
 
 export const adminNavItems = [
   {
@@ -173,21 +174,8 @@ export function AdminMobileNav({
           }`}
         >
           <div className="flex items-start justify-between border-b border-white/10 px-5 py-5">
-            <Link href="/" className="flex items-center gap-2" onClick={close}>
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 text-white">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path
-                    d="M4 19.5V6a2 2 0 0 1 2-2h14v14H6.5a2.5 2.5 0 0 0 0 5H20"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
-              <span className="text-sm font-bold tracking-tight text-white">
-                Academic Resource Hub
-              </span>
+            <Link href="/" onClick={close}>
+              <Logo light />
             </Link>
             <button
               type="button"

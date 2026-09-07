@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Logo } from "./logo";
 
 const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "Academic Resource Hub";
 
@@ -14,22 +15,7 @@ export function SiteFooter() {
     <footer className="border-t border-neutral-200 bg-neutral-100">
       <div className="container-page grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-700 to-brand-900 text-white">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path
-                  d="M4 19.5V6a2 2 0 0 1 2-2h14v14H6.5a2.5 2.5 0 0 0 0 5H20"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-            <span className="text-sm font-bold tracking-tight text-neutral-900">
-              Academic Resource Hub
-            </span>
-          </div>
+          <Logo className="text-base" />
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-neutral-600">
             Ghana&apos;s digital academic library — find, purchase, and study
             past questions and academic resources, on any device.

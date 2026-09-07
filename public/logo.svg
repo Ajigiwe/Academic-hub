@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 132" fill="none">
+  <!-- Academic Hub mark: AH monogram + waves. Navy #0B2D5B primary, blue #2563EB accent. -->
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <!-- A left leg (slate navy) -->
+    <path d="M40 30 L16 90" stroke="#24417a" stroke-width="10"/>
+    <!-- A right leg / H left stem, shared (slate navy) -->
+    <path d="M40 30 L40 90" stroke="#24417a" stroke-width="10"/>
+    <!-- A crossbar (bright blue accent) -->
+    <path d="M24 64 L44 64" stroke="#2563eb" stroke-width="8.5"/>
+    <!-- H right stem, taller (deep navy primary) -->
+    <path d="M72 22 L72 90" stroke="#0b2d5b" stroke-width="11"/>
+    <!-- H crossbar (slate navy) -->
+    <path d="M40 58 L72 58" stroke="#24417a" stroke-width="8.5"/>
+    <!-- waves -->
+    <path d="M8 104 C26 97 44 111 62 102" stroke="#2563eb" stroke-width="5"/>
+    <path d="M18 114 C34 108 52 120 70 111" stroke="#0b2d5b" stroke-width="4"/>
+  </g>
+</svg>

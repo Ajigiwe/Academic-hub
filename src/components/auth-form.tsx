@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
+import { Logo } from "./logo";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
@@ -42,10 +43,13 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
   return (
     <div className="card-padded w-full max-w-md">
-      <h1 className="text-xl font-bold text-neutral-900">
+      <div className="mb-6 flex flex-col items-center">
+        <Logo tagline className="text-lg" />
+      </div>
+      <h1 className="text-center text-xl font-bold text-neutral-900">
         {isRegister ? "Create your account" : "Welcome back"}
       </h1>
-      <p className="mt-1 text-sm text-neutral-600">
+      <p className="mt-1 text-center text-sm text-neutral-600">
         {isRegister
           ? "Find, purchase, and study past questions."
           : "Log in to access your library."}
