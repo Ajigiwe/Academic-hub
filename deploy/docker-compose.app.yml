@@ -5,8 +5,9 @@
 #
 # The app is deliberately bound to 127.0.0.1 — nginx (on the host)
 # terminates TLS and reverse-proxies to it, matching your existing
-# podiumclass stack. Postgres is bound to 127.0.0.1:5432 so host-side
-# one-off commands (prisma migrate deploy, seed) can reach it directly.
+# podiumclass stack. Postgres is bound to 127.0.0.1:5433 so host-side
+# one-off commands (prisma migrate deploy, seed) can reach it directly
+# (5433 avoids clashes with any Postgres already on the host).
 
 services:
   postgres:
@@ -17,7 +18,7 @@ services:
       POSTGRES_PASSWORD: ${PG_PASSWORD:?set PG_PASSWORD in .env.production}
       POSTGRES_DB: pastq
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -33,7 +34,7 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:3001:3000"
-    env_file: deploy/.env.production
+    env_file: .env.production
     depends_on:
       postgres:
         condition: service_healthy

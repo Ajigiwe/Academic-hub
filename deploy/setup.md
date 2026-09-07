@@ -30,6 +30,9 @@ nginx (80/443, certbot TLS)
 cd /srv/academic-hub
 cp deploy/.env.production.example deploy/.env.production
 nano deploy/.env.production      # fill PG_PASSWORD, MinIO/R2 keys, PAGE_TOKEN_SECRET
+# Compose reads ${PG_PASSWORD} for interpolation from the project-dir .env:
+cp deploy/.env.production deploy/.env
+chmod 600 deploy/.env.production deploy/.env
 ```
 
 ## 2. Start Postgres + the app
@@ -47,7 +50,7 @@ from the host with the repo's dev deps:
 ```bash
 cd /srv/academic-hub
 npm ci
-export DATABASE_URL="postgresql://pastq:<PG_PASSWORD>@127.0.0.1:5432/pastq"
+export DATABASE_URL="postgresql://pastq:<PG_PASSWORD>@127.0.0.1:5433/pastq"
 npx prisma migrate deploy
 npx tsx prisma/seed.ts
 # optional: create the demo bundle + paid order (needs the storage env vars)
@@ -80,7 +83,7 @@ cd /srv/academic-hub
 git pull
 docker compose -f deploy/docker-compose.app.yml up -d --build
 # only when prisma/schema.prisma changed:
-export DATABASE_URL="postgresql://pastq:<PG_PASSWORD>@127.0.0.1:5432/pastq"
+export DATABASE_URL="postgresql://pastq:<PG_PASSWORD>@127.0.0.1:5433/pastq"
 npx prisma migrate deploy
 ```
 
