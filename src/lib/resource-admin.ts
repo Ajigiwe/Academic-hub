@@ -326,10 +326,13 @@ export async function uploadResourceFiles(input: {
     },
   });
 
-  const result = await prisma.$transaction(async (tx) => {
-    const files: BulkUploadResult["files"] = [];
+  // Generous timeout: on high-latency links (e.g. a local script against a
+  // hosted Neon DB) per-file round trips can exceed Prisma's 5s default.
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const files: BulkUploadResult["files"] = [];
 
-    for (const vf of validFiles) {
+      for (const vf of validFiles) {
       const fallbackTitle = `${bundleFull.course.code} Past Question`;
       const title = titleFromFileName(vf.file.name, fallbackTitle);
       const slug = await uniqueResourceSlug(
@@ -381,8 +384,10 @@ export async function uploadResourceFiles(input: {
       });
     }
 
-    return { files };
-  });
+      return { files };
+    },
+    { timeout: 60_000 },
+  );
 
   // Storage writes AFTER commit: a failed upload leaves no phantom rows.
   for (const vf of validFiles) {
@@ -426,35 +431,38 @@ export async function replaceResourceFile(input: {
   });
   if (!existing) throw new Error("Target resource no longer exists.");
 
-  await prisma.$transaction(async (tx) => {
-    await tx.resourceFile.updateMany({
-      where: { resourceId: existing.id, isCurrent: true },
-      data: { isCurrent: false },
-    });
-    await tx.resourceFile.create({
-      data: {
-        resourceId: existing.id,
-        storageKey: vf.storageKey,
-        mimeType: "application/pdf",
-        sizeBytes: vf.buf.length,
-        checksum: vf.checksum,
-        originalName: input.file.name || "upload.pdf",
-        isCurrent: true,
-      },
-    });
-    await tx.resource.update({
-      where: { id: existing.id },
-      data: { pageCount: vf.pageCount },
-    });
-    await tx.accessLog.create({
-      data: {
-        userId: input.adminId,
-        resourceId: existing.id,
-        action: "OPENED_RESOURCE",
-        detail: `Replaced file with ${vf.buf.length} bytes at ${vf.storageKey} (pages: ${vf.pageCount})`,
-      },
-    });
-  });
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.resourceFile.updateMany({
+        where: { resourceId: existing.id, isCurrent: true },
+        data: { isCurrent: false },
+      });
+      await tx.resourceFile.create({
+        data: {
+          resourceId: existing.id,
+          storageKey: vf.storageKey,
+          mimeType: "application/pdf",
+          sizeBytes: vf.buf.length,
+          checksum: vf.checksum,
+          originalName: input.file.name || "upload.pdf",
+          isCurrent: true,
+        },
+      });
+      await tx.resource.update({
+        where: { id: existing.id },
+        data: { pageCount: vf.pageCount },
+      });
+      await tx.accessLog.create({
+        data: {
+          userId: input.adminId,
+          resourceId: existing.id,
+          action: "OPENED_RESOURCE",
+          detail: `Replaced file with ${vf.buf.length} bytes at ${vf.storageKey} (pages: ${vf.pageCount})`,
+        },
+      });
+    },
+    { timeout: 60_000 },
+  );
 
   await putObject(vf.storageKey, vf.buf, "application/pdf");
   const head = await getObjectHead(vf.storageKey);
