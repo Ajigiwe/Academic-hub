@@ -1,26 +1,203 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* Brand — deep academic green, gold accent */
+  --color-brand-50: #ecfdf3;
+  --color-brand-100: #d1fadf;
+  --color-brand-200: #a6f4c5;
+  --color-brand-300: #6ce9a6;
+  --color-brand-400: #32d583;
+  --color-brand-500: #12b76a;
+  --color-brand-600: #039855;
+  --color-brand-700: #027a48;
+  --color-brand-800: #054f31;
+  --color-brand-900: #03301e;
+  --color-brand-950: #022015;
+
+  --color-gold-300: #fec84b;
+  --color-gold-400: #fdb022;
+  --color-gold-500: #f79009;
+  --color-gold-600: #dc6803;
+
+  --shadow-soft: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+  --shadow-card: 0 2px 4px -2px rgb(16 24 40 / 0.06), 0 4px 8px -2px rgb(16 24 40 / 0.08);
+  --shadow-lift: 0 4px 6px -2px rgb(16 24 40 / 0.05), 0 10px 16px -4px rgb(16 24 40 / 0.12);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    @apply bg-neutral-50 text-neutral-900 antialiased;
+  }
+  h1, h2, h3, h4 {
+    @apply tracking-tight;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+  }
+  .container-admin {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6;
+  }
+
+  /* Buttons — base utilities inlined in every variant (Tailwind 4 does
+     not allow component classes to @apply each other). */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-50 bg-brand-700 text-white shadow-soft hover:bg-brand-800 hover:shadow-card active:bg-brand-900;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-50 border border-neutral-300 bg-white text-neutral-800 shadow-soft hover:border-neutral-400 hover:bg-neutral-50;
+  }
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-50 bg-gold-500 text-white shadow-soft hover:bg-gold-600;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-50 bg-red-600 text-white shadow-soft hover:bg-red-700;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-50 text-neutral-700 hover:bg-neutral-100;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  /* Forms */
+  .label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-neutral-600;
+  }
+  .input {
+    @apply w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 placeholder-neutral-400 shadow-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20;
+  }
+
+  /* Surfaces */
+  .card {
+    @apply rounded-xl border border-neutral-200 bg-white shadow-soft;
+  }
+  .card-padded {
+    @apply rounded-xl border border-neutral-200 bg-white p-5 shadow-soft;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .badge-brand {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-brand-50 text-brand-700;
+  }
+  .badge-neutral {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-neutral-100 text-neutral-700;
+  }
+  .badge-gold {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-50 text-amber-700;
+  }
+  .badge-success {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800;
+  }
+  .badge-danger {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-700;
+  }
+
+  /* Tables (admin) */
+  .table-base {
+    @apply w-full text-left text-sm;
+  }
+  .table-base thead {
+    @apply border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500;
+  }
+  .table-base th {
+    @apply px-4 py-3 font-semibold;
+  }
+  .table-base td {
+    @apply border-b border-neutral-100 px-4 py-3;
+  }
+
+  /* Responsive admin tables: below md, each row becomes a stacked card
+     and each cell renders as "<data-label>: <value>". Add data-label to
+     every <td>; action cells get data-label="" (label suppressed). */
+  @media (max-width: 767px) {
+    .table-responsive {
+      display: block;
+    }
+    .table-responsive thead {
+      display: none;
+    }
+    .table-responsive tbody {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .table-responsive tr {
+      display: block;
+      border: 1px solid var(--color-neutral-200);
+      border-radius: 0.75rem;
+      background: var(--color-white, #fff);
+      box-shadow: 0 1px 2px rgb(16 24 40 / 0.05);
+      overflow: hidden;
+    }
+    .table-responsive td {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--color-neutral-100);
+      padding: 0.625rem 1rem;
+      text-align: right;
+    }
+    .table-responsive td:last-child {
+      border-bottom: none;
+    }
+    .table-responsive td::before {
+      content: attr(data-label);
+      @apply text-[11px] font-semibold uppercase tracking-wide text-neutral-500;
+      text-align: left;
+      flex-shrink: 0;
+    }
+    /* Label-less cells become full-width footer rows */
+    .table-responsive td[data-label=""] {
+      justify-content: flex-start;
+      text-align: left;
+      background: var(--color-neutral-50, #fafafa);
+    }
+    .table-responsive td[data-label=""]::before {
+      content: none;
+    }
+    /* First cell acts as the card header — slightly larger, tinted */
+    .table-responsive td[data-label]:first-child {
+      background: linear-gradient(to bottom, var(--color-neutral-50, #fafafa), transparent);
+      font-weight: 600;
+    }
+    .table-responsive td:first-child::before {
+      @apply text-brand-800;
+    }
+    /* Full-bleed empty-state cells */
+    .table-responsive td[colspan] {
+      display: block;
+      text-align: center;
+    }
+    .table-responsive td[colspan]::before {
+      content: none;
+    }
+    /* Value side may wrap (emails, titles); the label never shrinks */
+    .table-responsive td > * {
+      min-width: 0;
+    }
+    .table-responsive td > span,
+    .table-responsive td > a,
+    .table-responsive td > p,
+    .table-responsive td > div {
+      overflow-wrap: anywhere;
+    }
+  }
+
+  /* Admin sidebar */
+  .admin-nav-link {
+    @apply flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-white/5 hover:text-white;
+  }
+  .admin-nav-link-active {
+    @apply flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium bg-white/10 text-white;
+  }
 }

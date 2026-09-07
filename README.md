@@ -1,36 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Past Question Marketplace (PWA)
 
-## Getting Started
+A student-focused PWA for discovering, purchasing, and securely reading academic
+past questions. Built for a single Ghanaian institution (MVP), designed to grow
+into a multi-institution marketplace.
 
-First, run the development server:
+**Product spec:** see `design(1).md` — this codebase implements Sprint 1–5
+foundations of its roadmap: auth, catalog + search, checkout with a payment
+abstraction, entitlements, a secure viewer shell, admin, and the PWA base.
+
+## Stack
+
+- **Next.js 16** (App Router, TypeScript, Tailwind v4) — frontend + API
+- **PostgreSQL 16** via **Prisma 6**
+- **Private S3-compatible storage** (MinIO in dev; S3/R2 in production)
+- **Payment abstraction layer** with a built-in sandbox gateway (real
+  providers like Paystack plug into the same interface)
+
+## Getting started
+
+Requires Node 20+. No Docker — Postgres and MinIO run as portable,
+terminal-managed binaries via `scripts/services.mjs` (first run auto-downloads
+nothing except the MinIO server, which lives in `services/minio/`).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+
+# 1. Start Postgres + MinIO (initdb on first run; creates the private bucket)
+npm run services:up
+
+# 2. Create the schema and seed demo data
+npm run db:migrate     # name it e.g. "init"
+npm run db:seed
+
+# 3. Run the app
+npm run dev            # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Stop everything with `npm run services:down`; check state with
+`npm run services:status`. MinIO console (dev only): http://localhost:9001
+(`pastq-dev-key` / `pastq-dev-secret`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Demo accounts (from seed)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Role    | Email                | Password      |
+| ------- | -------------------- | ------------- |
+| Admin   | `admin@pastq.test`   | `Admin@12345` |
+| Student | `student@pastq.test` | `Student@123` |
 
-## Learn More
+### Buying something (sandbox)
 
-To learn more about Next.js, take a look at the following resources:
+Log in as the student → open any resource → **Buy Now** → the sandbox
+"Mobile Money" page lets you approve, fail, or cancel. Approving fires a signed
+webhook → server-side verification → entitlement grant → the resource appears
+in **My Library** → open the secure viewer.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## How the security model is wired
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Documents live only in **private object storage**; no public file URLs, ever.
+  Storage keys are random, sharded, and content-disposition `inline`.
+- Every viewer path runs the chain: **authenticated → entitled → viewing
+  session → render**, all server-side (`src/lib/entitlements.ts` is the single
+  source of truth).
+- Payments: the frontend's "success" is never trusted. Fulfillment happens only
+  after **server-to-server verification** (webhook with HMAC signature +
+  `webhook_events` dedupe table for idempotency; the gateway-return callback is
+  a resilient fallback that also re-verifies). Order fulfillment is idempotent,
+  and the `(user, resource)` unique constraint prevents duplicate entitlements.
+- All money is integer pesewas. Sessions are hashed tokens in the DB with
+  httpOnly cookies. Authorization is always server-side (spec §14/§31).
 
-## Deploy on Vercel
+## Project layout
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+prisma/schema.prisma      # domain model
+src/lib/                  # db, auth, entitlements, payments, storage, validation
+src/app/api/              # REST endpoints (auth, orders, payments, viewer)
+src/app/(auth)/           # login / register
+src/app/resources/        # catalog + detail pages
+src/app/checkout, payment # checkout + gateway result flows
+src/app/viewer/           # secure viewer
+src/app/library, account  # student area
+src/app/admin/            # admin area (dashboard, resources, orders, students)
+public/sw.js              # PWA service worker (offline shell)
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Roadmap (from the spec)
+
+1. **Next:** resource upload (admin) → storage + page-rendering pipeline →
+   real page rendering in the viewer (server-rasterized pages with burned-in
+   watermarks), replace the sandbox gateway with a real provider (Paystack).
+2. Then: PWA caching sprint, offline reading, favourites, reviews, coupons.
+3. Later: multi-seller marketplace (spec §41), native apps (spec §40).
+
+## Conventions
+
+- Never store or compute money as floats.
+- Never trust the client for authorization or payment state.
+- Access-control decisions belong in `src/lib/entitlements.ts`, not pages.

@@ -1,0 +1,429 @@
+// Past Question Marketplace — core domain schema (Sprint 1)
+// Fixed single-institution MVP: institution is a settings row, not a browse dimension.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Users & auth
+// ────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  STUDENT
+  ADMIN
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime? @map("email_verified")
+  passwordHash  String    @map("password_hash")
+  firstName     String    @map("first_name")
+  lastName      String    @map("last_name")
+  phone         String?
+  role          UserRole  @default(STUDENT)
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  sessions         Session[]
+  orders           Order[]
+  entitlements     Entitlement[]
+  favourites       Favourite[]
+  notifications    Notification[]
+  viewingSessions  ViewingSession[]
+  accessLogs       AccessLog[]
+  recentlyViewed   RecentlyViewed[]
+
+  @@index([status])
+  @@map("users")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  userAgent String?
+  ipAddress String?  @map("ip_address")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Academic structure (course is global; programme is per-institution label)
+// ────────────────────────────────────────────────────────────────
+
+model Programme {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  resources Resource[]
+  bundles   Bundle[]
+
+  @@map("programmes")
+}
+
+model Course {
+  id        String   @id @default(cuid())
+  code      String   @unique // "ICT 201"
+  title     String // "Database Systems"
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  resources Resource[]
+  bundles   Bundle[]
+
+  @@index([title])
+  @@map("courses")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Bundles — the unit of sale. Students buy ONE bundle per course +
+// academic year ("ICT 201 · 2024/2025") and unlock every paper inside
+// it. PDFs are uploaded in bulk into a bundle; individual resources
+// are never sold on their own.
+// ────────────────────────────────────────────────────────────────
+
+model Bundle {
+  id            String         @id @default(cuid())
+  slug          String         @unique // "ict-201-database-systems-2024-2025"
+  title         String // "ICT 201 — Database Systems · 2024/2025 Past Questions"
+  description   String?
+  status        ResourceStatus @default(DRAFT)
+  level         Int // 100, 200, 300, 400…
+  academicYear  String         @map("academic_year") // "2024/2025"
+  pricePesewas  Int            @map("price_pesewas") // bundle price; never floats for money
+  publishedAt   DateTime?      @map("published_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  programme   Programme @relation(fields: [programmeId], references: [id])
+  programmeId String    @map("programme_id")
+
+  course   Course @relation(fields: [courseId], references: [id])
+  courseId String @map("course_id")
+
+  resources  Resource[]
+  orderItems OrderItem[]
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([courseId])
+  @@index([programmeId])
+  @@index([academicYear])
+  @@map("bundles")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Resources
+// ────────────────────────────────────────────────────────────────
+
+enum ResourceStatus {
+  DRAFT
+  PUBLISHED
+  UNPUBLISHED
+  ARCHIVED
+}
+
+enum ResourceType {
+  PAST_QUESTION
+  LECTURE_NOTES
+  REVISION
+  PRACTICE
+}
+
+model Resource {
+  id            String         @id @default(cuid())
+  slug          String         @unique // "ict-201-database-systems-2024-2025-sem1-exam"
+  title         String
+  description   String?
+  type          ResourceType   @default(PAST_QUESTION)
+  status        ResourceStatus @default(DRAFT)
+  level         Int // 100, 200, 300, 400…
+  semester      Int // 1 | 2
+  academicYear  String         @map("academic_year") // "2024/2025"
+  pageCount     Int?           @map("page_count")
+  previewPages  Int            @default(0) @map("preview_pages")
+  downloadCount Int            @default(0) @map("download_count")
+  publishedAt   DateTime?      @map("published_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  bundle   Bundle @relation(fields: [bundleId], references: [id], onDelete: Restrict)
+  bundleId String @map("bundle_id")
+
+  programme   Programme @relation(fields: [programmeId], references: [id])
+  programmeId String    @map("programme_id")
+
+  course   Course @relation(fields: [courseId], references: [id])
+  courseId String @map("course_id")
+
+  files           ResourceFile[]
+  entitlements    Entitlement[]
+  favourites      Favourite[]
+  viewingSessions ViewingSession[]
+  recentlyViewed  RecentlyViewed[]
+  accessLogs      AccessLog[]
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([bundleId])
+  @@index([courseId])
+  @@index([programmeId])
+  @@index([academicYear])
+  @@map("resources")
+}
+
+model ResourceFile {
+  id            String   @id @default(cuid())
+  resourceId    String   @map("resource_id")
+  storageKey    String   @map("storage_key") // private/resources/8f/4c/93b1c2e8.bin
+  mimeType      String   @map("mime_type")
+  sizeBytes     Int      @map("size_bytes")
+  checksum      String? // sha256, integrity check
+  originalName  String   @map("original_name") // audit only; never exposed in URLs
+  isCurrent     Boolean  @default(true) @map("is_current")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([resourceId])
+  @@map("resource_files")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Orders & payments
+// ────────────────────────────────────────────────────────────────
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  reference     String      @unique // PQ-XXXXXX, unique human-readable ref
+  userId        String      @map("user_id")
+  status        OrderStatus @default(PENDING)
+  amountPesewas Int         @map("amount_pesewas")
+  currency      String      @default("GHS")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  paidAt        DateTime?   @map("paid_at")
+
+  user        User        @relation(fields: [userId], references: [id])
+  items       OrderItem[]
+  payments    Payment[]
+  entitlements Entitlement[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String @id @default(cuid())
+  orderId    String @map("order_id")
+  bundleId   String @map("bundle_id")
+  // price captured at purchase time (immutable even if catalog price changes)
+  unitPricePesewas Int  @map("unit_price_pesewas")
+  quantity         Int  @default(1)
+
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  bundle Bundle @relation(fields: [bundleId], references: [id])
+
+  @@unique([orderId, bundleId])
+  @@index([bundleId])
+  @@map("order_items")
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentChannel {
+  MOCK
+  MOBILE_MONEY
+  CARD
+}
+
+model Payment {
+  id            String         @id @default(cuid())
+  orderId       String         @map("order_id")
+  provider      String // "mock" | "paystack" | …
+  providerRef   String?        @map("provider_ref") @unique // gateway transaction id
+  reference     String // our order reference, indexed for lookups
+  channel       PaymentChannel
+  status        PaymentStatus  @default(PENDING)
+  amountPesewas Int            @map("amount_pesewas")
+  currency      String         @default("GHS")
+  failureReason String?        @map("failure_reason")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  verifiedAt    DateTime?      @map("verified_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([reference])
+  @@index([status])
+  @@map("payments")
+}
+
+// Raw webhook payloads — idempotency + audit trail (spec §11)
+model WebhookEvent {
+  id           String   @id @default(cuid())
+  provider     String
+  eventId      String   @unique // provider's event id — dedupe key
+  type         String
+  payload      Json
+  processedAt  DateTime? @map("processed_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([provider, createdAt])
+  @@map("webhook_events")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Entitlements & viewing (spec §26)
+// ────────────────────────────────────────────────────────────────
+
+model Entitlement {
+  id          String        @id @default(cuid())
+  userId      String        @map("user_id")
+  resourceId  String        @map("resource_id")
+  orderId     String        @map("order_id")
+  accessType  String        @default("permanent") @map("access_type")
+  status      String        @default("active")
+  purchasedAt DateTime      @default(now()) @map("purchased_at")
+  offlineUntil DateTime?    @map("offline_until") // phase 2
+
+  user      User         @relation(fields: [userId], references: [id])
+  resource  Resource     @relation(fields: [resourceId], references: [id])
+  order     Order        @relation(fields: [orderId], references: [id])
+  viewingSessions ViewingSession[]
+
+  @@unique([userId, resourceId]) // prevents duplicate entitlements (spec §11)
+  @@index([userId, status])
+  @@map("entitlements")
+}
+
+model ViewingSession {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  resourceId  String   @map("resource_id")
+  // Null for role-granted access (admins) — entitlement purchases set it.
+  entitlementId String? @map("entitlement_id")
+  startedAt   DateTime @default(now()) @map("started_at")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+  endedAt     DateTime? @map("ended_at")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+
+  user        User        @relation(fields: [userId], references: [id])
+  resource    Resource    @relation(fields: [resourceId], references: [id])
+  entitlement Entitlement? @relation(fields: [entitlementId], references: [id])
+
+  @@index([userId, resourceId])
+  @@map("viewing_sessions")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Engagement
+// ────────────────────────────────────────────────────────────────
+
+model Favourite {
+  userId     String   @map("user_id")
+  resourceId String   @map("resource_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@id([userId, resourceId])
+  @@map("favourites")
+}
+
+model RecentlyViewed {
+  userId     String   @map("user_id")
+  resourceId String   @map("resource_id")
+  viewedAt   DateTime @default(now()) @map("viewed_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@id([userId, resourceId])
+  @@map("recently_viewed")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Logging & notifications
+// ────────────────────────────────────────────────────────────────
+
+enum AccessAction {
+  OPENED_RESOURCE
+  STARTED_VIEWER
+  PAGE_VIEWED
+  ACCESS_DENIED
+}
+
+model AccessLog {
+  id         String       @id @default(cuid())
+  userId     String?      @map("user_id") // null = anonymous denial
+  resourceId String?      @map("resource_id")
+  action     AccessAction
+  ipAddress  String?      @map("ip_address")
+  userAgent  String?      @map("user_agent")
+  detail     String?
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  resource Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([resourceId, createdAt(sort: Desc)])
+  @@map("access_logs")
+}
+
+enum NotificationType {
+  PURCHASE
+  PAYMENT
+  SYSTEM
+  PROMO
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           @map("user_id")
+  type      NotificationType @default(SYSTEM)
+  title     String
+  body      String
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
