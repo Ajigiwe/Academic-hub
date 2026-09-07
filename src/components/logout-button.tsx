@@ -3,13 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function LogoutButton() {
+export function LogoutButton({ className }: { className?: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
   return (
     <button
-      className="btn-ghost btn-sm"
+      className={className ?? "btn-ghost btn-sm"}
       disabled={pending}
       onClick={async () => {
         setPending(true);

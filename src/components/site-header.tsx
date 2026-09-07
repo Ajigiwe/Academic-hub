@@ -14,9 +14,11 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
   const inAdmin = pathname?.startsWith("/admin") ?? false;
 
   return (
+    // Admin renders its own console chrome (dark rail + mobile app bar) —
+    // the public site header is hidden there entirely.
     <header
       className={`sticky top-0 z-40 border-b border-neutral-200/80 bg-white/90 backdrop-blur-md ${
-        inAdmin ? "max-md:hidden" : ""
+        inAdmin ? "hidden" : ""
       }`}
     >
       {/* Gold accent line — brand signature */}
