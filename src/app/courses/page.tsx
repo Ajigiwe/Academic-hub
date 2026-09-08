@@ -12,6 +12,7 @@ import {
 } from "@/lib/programmes";
 import { BundleCard } from "@/components/bundle-card";
 import { FreeMaterialCard } from "@/components/free-material-card";
+import { RefineBar } from "@/components/refine-bar";
 
 interface SearchParams {
   programme?: string;
@@ -38,10 +39,11 @@ export default async function CoursesPage({
   const semester = sp.semester === "1" || sp.semester === "2" ? Number(sp.semester) : undefined;
 
   const guided = Boolean(programme && level && semester);
+  const anyFilter = Boolean(programme || level || semester);
   const programmeMeta = programmeBySlug(programme);
 
   const [{ items, total }, freeMaterials] = await Promise.all([
-    guided
+    anyFilter
       ? searchBundles({ programme, level, semester, perPage: 50 })
       : Promise.resolve({ items: [], total: 0 }),
     getFreeMaterials({ programme, level, semester }),
@@ -68,30 +70,47 @@ export default async function CoursesPage({
       <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
-            {guided
-              ? `${programmeMeta?.short} · Level ${level} · ${SEMESTER_LABEL[semester as 1 | 2]}`
+            {anyFilter
+              ? [
+                  programmeMeta?.short,
+                  level ? `Level ${level}` : undefined,
+                  semester ? SEMESTER_LABEL[semester as 1 | 2] : undefined,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
               : "Courses & materials"}
           </h1>
           <p className="mt-1 text-sm text-neutral-600">
-            {guided
+            {anyFilter
               ? `${total} course bundle${total === 1 ? "" : "s"} for sale, plus free materials — one price unlocks every paper in a bundle.`
-              : "Use the picker on the homepage to narrow by programme, year, and semester."}
+              : "Filter by programme, year, and semester to see the courses you can pay for."}
           </p>
         </div>
         <Link href="/#browse" className="btn-secondary btn-sm">
-          Change selection
+          Guided picker
         </Link>
       </div>
 
-      {!guided ? (
+      {/* In-place refinement — works with any combination of filters */}
+      <RefineBar
+        base="/courses"
+        programme={programme}
+        level={level}
+        semester={semester}
+        resultLabel={`${total} bundle${total === 1 ? "" : "s"} · ${freeMaterials.length} free material${freeMaterials.length === 1 ? "" : "s"}`}
+      />
+
+      {!anyFilter ? (
         <div className="card-padded mt-6 py-16 text-center">
-          <p className="font-medium text-neutral-800">Pick your programme, year, and semester</p>
-          <p className="mx-auto mt-1 max-w-md text-sm text-neutral-600">
-            The guided picker on the homepage takes you straight to the courses
-            you can pay for — plus free materials for your level.
+          <p className="font-medium text-neutral-800">
+            Choose your programme, year, and semester above
           </p>
-          <Link href="/" className="btn-primary mt-5">
-            Find my courses →
+          <p className="mx-auto mt-1 max-w-md text-sm text-neutral-600">
+            Or use the guided picker on the homepage — it walks you through
+            the three steps and shows the courses you can pay for.
+          </p>
+          <Link href="/#browse" className="btn-primary mt-5">
+            Open the guided picker →
           </Link>
         </div>
       ) : (

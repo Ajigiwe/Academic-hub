@@ -7,6 +7,7 @@ import {
   isLevel,
 } from "@/lib/programmes";
 import { FreeMaterialCard } from "@/components/free-material-card";
+import { RefineBar } from "@/components/refine-bar";
 
 interface SearchParams {
   programme?: string;
@@ -69,9 +70,18 @@ export default async function MaterialsPage({
           </p>
         </div>
         <Link href="/#browse" className="btn-secondary btn-sm">
-          Change selection
+          Guided picker
         </Link>
       </div>
+
+      {/* In-place refinement — works with any combination of filters */}
+      <RefineBar
+        base="/materials"
+        programme={programme}
+        level={level}
+        semester={semester}
+        resultLabel={`${materials.length} free download${materials.length === 1 ? "" : "s"}`}
+      />
 
       {materials.length === 0 ? (
         <div className="card-padded mt-6 py-16 text-center">
