@@ -23,6 +23,10 @@ RUN npm run build
 # ── Stage 3: run ─────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
 WORKDIR /app
+# @napi-rs/canvas draws ALL text (watermarks, preview marks) through
+# fontconfig — on bare alpine there are zero fonts and fillText
+# silently produces nothing, so pages render blank of any text.
+RUN apk add --no-cache fontconfig font-dejavu
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
