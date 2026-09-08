@@ -170,6 +170,7 @@ export async function getFreeMaterials(filters: {
   programme?: string;
   level?: number;
   semester?: number;
+  q?: string;
 }) {
   const where: Prisma.ResourceWhereInput = {
     status: "PUBLISHED",
@@ -178,6 +179,16 @@ export async function getFreeMaterials(filters: {
   if (filters.programme) where.programme = { is: { slug: filters.programme } };
   if (filters.level) where.level = filters.level;
   if (filters.semester) where.semester = filters.semester;
+  if (filters.q?.trim()) {
+    const q = filters.q.trim();
+    where.OR = [
+      { title: { contains: q, mode: "insensitive" } },
+      { description: { contains: q, mode: "insensitive" } },
+      { course: { is: { code: { contains: q, mode: "insensitive" } } } },
+      { course: { is: { title: { contains: q, mode: "insensitive" } } } },
+      { programme: { is: { name: { contains: q, mode: "insensitive" } } } },
+    ];
+  }
 
   return prisma.resource.findMany({
     where,

@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { searchBundles, getProgrammes, getFilterYears } from "@/lib/resources";
+import { searchBundles, getFreeMaterials, getProgrammes, getFilterYears } from "@/lib/resources";
 import { BundleCard } from "@/components/bundle-card";
+import { FreeMaterialCard } from "@/components/free-material-card";
 import { FilterPanel } from "@/components/filter-panel";
 
 interface SearchParams {
@@ -28,8 +29,11 @@ export default async function SearchPage({
     ? (sp.sort as "relevance" | "newest" | "popular" | "price_asc" | "price_desc")
     : "relevance";
 
-  const [{ items, total, pages }, programmes, years] = await Promise.all([
+  const [{ items, total, pages }, freeMaterials, programmes, years] = await Promise.all([
     searchBundles({ q: sp.q, programme: sp.programme, level, semester, year: sp.year, sort, page }),
+    // Free materials respect the same filters except academic year — they
+    // are tagged with the current year, so a year filter would hide them.
+    getFreeMaterials({ q: sp.q, programme: sp.programme, level, semester }),
     getProgrammes(),
     getFilterYears(),
   ]);
@@ -118,15 +122,27 @@ export default async function SearchPage({
         {/* Results */}
         <div>
           {!hasResults ? (
-            <div className="card-padded py-16 text-center">
-              <p className="font-medium text-neutral-800">
-                No past-question bundles found for your search.
-              </p>
-              <p className="mt-1 text-sm text-neutral-600">
-                Try different keywords or clear the filters.
-              </p>
-              <Link href="/search" className="btn-secondary mt-5">Clear Filters</Link>
-            </div>
+            freeMaterials.length > 0 ? (
+              <div className="card-padded py-10 text-center">
+                <p className="font-medium text-neutral-800">
+                  No paid bundles match — but these free materials do
+                </p>
+                <p className="mt-1 text-sm text-neutral-600">
+                  Download them below, or try different keywords.
+                </p>
+                <Link href="/search" className="btn-secondary mt-5">Clear Filters</Link>
+              </div>
+            ) : (
+              <div className="card-padded py-16 text-center">
+                <p className="font-medium text-neutral-800">
+                  No past-question bundles found for your search.
+                </p>
+                <p className="mt-1 text-sm text-neutral-600">
+                  Try different keywords or clear the filters.
+                </p>
+                <Link href="/search" className="btn-secondary mt-5">Clear Filters</Link>
+              </div>
+            )
           ) : (
             <>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -153,6 +169,29 @@ export default async function SearchPage({
                 </nav>
               )}
             </>
+          )}
+
+          {/* Free downloadable materials — same filters, one place */}
+          {freeMaterials.length > 0 && (
+            <section className="mt-10 border-t border-neutral-200 pt-8">
+              <div className="flex items-baseline justify-between gap-2">
+                <h2 className="text-base font-bold tracking-tight text-neutral-900">
+                  Free study materials
+                </h2>
+                <span className="text-xs text-neutral-500">
+                  {freeMaterials.length} available
+                </span>
+              </div>
+              <p className="mt-0.5 text-sm text-neutral-500">
+                Slides, notes, and revision packs matching your search —
+                download them free, no payment needed.
+              </p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {freeMaterials.map((m) => (
+                  <FreeMaterialCard key={m.id} material={m} />
+                ))}
+              </div>
+            </section>
           )}
         </div>
       </div>
