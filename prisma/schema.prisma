@@ -146,6 +146,7 @@ enum ResourceStatus {
 enum ResourceType {
   PAST_QUESTION
   LECTURE_NOTES
+  SLIDES
   REVISION
   PRACTICE
 }
@@ -167,8 +168,10 @@ model Resource {
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
-  bundle   Bundle @relation(fields: [bundleId], references: [id], onDelete: Restrict)
-  bundleId String @map("bundle_id")
+  // Paid papers belong to a sale bundle; free materials (slides, notes)
+  // have no bundle and are served via the public download route instead.
+  bundle   Bundle? @relation(fields: [bundleId], references: [id], onDelete: SetNull)
+  bundleId String? @map("bundle_id")
 
   programme   Programme @relation(fields: [programmeId], references: [id])
   programmeId String    @map("programme_id")

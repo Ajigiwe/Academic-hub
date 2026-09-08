@@ -16,6 +16,7 @@ const statusBadge: Record<string, string> = {
 const typeLabel: Record<string, string> = {
   PAST_QUESTION: "Past question",
   LECTURE_NOTES: "Lecture notes",
+  SLIDES: "Slides",
   REVISION: "Revision",
   PRACTICE: "Practice",
 };

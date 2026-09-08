@@ -6,8 +6,10 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import {
   uploadResourceFiles,
+  uploadFreeMaterial,
   replaceResourceFile,
   bundleFormSchema,
+  freeMaterialFormSchema,
   formatZodIssues,
   MAX_UPLOAD_BYTES,
   slugify,
@@ -103,6 +105,74 @@ export async function uploadBundleFilesAction(
     };
   } catch (err) {
     console.error("Bulk upload failed:", err);
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "Upload failed — please retry.",
+    };
+  }
+}
+
+export interface FreeUploadState {
+  ok?: boolean;
+  message?: string;
+  resourceSlug?: string;
+}
+
+/**
+ * Upload ONE free material (slides / notes / revision pack) — not part
+ * of any sale bundle, published immediately, downloadable by anyone.
+ */
+export async function uploadFreeMaterialAction(
+  _prev: FreeUploadState,
+  formData: FormData,
+): Promise<FreeUploadState> {
+  const admin = await requireAdminUser();
+  if (!admin) return { ok: false, message: "Admin access required." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, message: "Choose a PDF file to upload." };
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return {
+      ok: false,
+      message: `"${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)} MB) — the limit is 30 MB.`,
+    };
+  }
+
+  const parsed = freeMaterialFormSchema.safeParse({
+    title: formData.get("title"),
+    description: formData.get("description"),
+    type: formData.get("type"),
+    level: formData.get("level"),
+    semester: formData.get("semester"),
+    courseCode: formData.get("courseCode"),
+    courseTitle: formData.get("courseTitle"),
+    programmeName: formData.get("programmeName"),
+  });
+  if (!parsed.success) {
+    return { ok: false, message: formatZodIssues(parsed.error) };
+  }
+
+  try {
+    const result = await uploadFreeMaterial({
+      file,
+      adminId: admin.id,
+      material: parsed.data,
+    });
+
+    revalidatePath("/admin/resources");
+    revalidatePath("/courses");
+    revalidatePath("/search");
+    revalidatePath("/");
+
+    return {
+      ok: true,
+      resourceSlug: result.slug,
+      message: `“${result.title}” published as a free download.`,
+    };
+  } catch (err) {
+    console.error("Free material upload failed:", err);
     return {
       ok: false,
       message: err instanceof Error ? err.message : "Upload failed — please retry.",

@@ -85,7 +85,7 @@ export default async function SearchPage({
               <label className="label" htmlFor="level">Level</label>
               <select id="level" name="level" defaultValue={sp.level ?? ""} className="input">
                 <option value="">Any</option>
-                {[100, 200, 300, 400, 500, 600].map((l) => (
+                {[100, 200, 300, 400].map((l) => (
                   <option key={l} value={l}>Level {l}</option>
                 ))}
               </select>

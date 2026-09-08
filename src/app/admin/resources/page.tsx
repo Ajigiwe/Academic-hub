@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { BundleUploadForm } from "@/components/bundle-upload-form";
+import { FreeMaterialUploadForm } from "@/components/free-material-upload-form";
 import { AdminResourceFilters } from "@/components/admin-resource-filters";
 import { setResourceStatusAction, deleteDraftAction } from "@/lib/admin-actions";
 
@@ -112,6 +113,22 @@ export default async function AdminResourcesPage({
         <BundleUploadForm bundles={bundles} suggestions={suggestions} />
       </section>
 
+      {/* ── Free materials upload ─────────────────────────────── */}
+      <section className="card mt-5 p-5">
+        <h2 className="text-base font-semibold text-neutral-900">
+          Upload free materials (not for sale)
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-neutral-600">
+          Slides, lecture notes, and revision packs. Students download these
+          for free — no bundle, no payment. They are tagged with a course,
+          programme track, level, and semester so they show up in the same
+          browse flow as paid papers.
+        </p>
+        <FreeMaterialUploadForm
+          suggestions={courses.map((c) => ({ code: c.code, title: c.title }))}
+        />
+      </section>
+
       {/* ── Catalog table ──────────────────────────────────────── */}
       <div className="mt-8 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-semibold text-neutral-900">
@@ -184,7 +201,7 @@ export default async function AdminResourcesPage({
                         {r.bundle.title}
                       </Link>
                     ) : (
-                      <span className="text-neutral-400">—</span>
+                      <span className="badge-gold">Free download</span>
                     )}
                   </td>
                   <td data-label="Programme" className="text-xs text-neutral-600">{r.programme.name}</td>

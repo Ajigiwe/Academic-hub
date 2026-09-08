@@ -62,6 +62,7 @@ export function AdminResourceEditForm({
         >
           <option value="PAST_QUESTION">Past question</option>
           <option value="LECTURE_NOTES">Lecture notes</option>
+          <option value="SLIDES">Slides</option>
           <option value="REVISION">Revision</option>
           <option value="PRACTICE">Practice</option>
         </select>

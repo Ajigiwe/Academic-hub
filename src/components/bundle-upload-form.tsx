@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { uploadBundleFilesAction, type UploadState } from "@/lib/admin-actions";
+import { PROGRAMMES } from "@/lib/programmes";
 
 export interface BundleOption {
   id: string;
@@ -144,7 +145,7 @@ export function BundleUploadForm({
                 Level
               </label>
               <select id="upload-level" name="level" defaultValue="200" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm">
-                {[100, 200, 300, 400, 500, 600, 700, 800].map((l) => (
+                {[100, 200, 300, 400].map((l) => (
                   <option key={l} value={l}>{l}</option>
                 ))}
               </select>
@@ -217,23 +218,25 @@ export function BundleUploadForm({
 
           <div>
             <label className="mb-1.5 block text-sm font-medium" htmlFor="upload-programme">
-              Programme <span className="text-red-600">*</span>
+              Programme track <span className="text-red-600">*</span>
             </label>
-            <input
+            <select
               id="upload-programme"
               name="programmeName"
               required
-              list="programme-names"
-              placeholder="BSc IT"
+              defaultValue={PROGRAMMES[0].name}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-            />
-            <datalist id="programme-names">
-              {Array.from(new Set(suggestions.flatMap((s) => s.programmes.map((p) => p.name)))).map(
-                (name) => (
-                  <option key={name} value={name} />
-                ),
-              )}
-            </datalist>
+            >
+              {PROGRAMMES.map((p) => (
+                <option key={p.slug} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-neutral-500">
+              Papers are grouped under this track — students pick it in the
+              browse flow.
+            </p>
           </div>
 
           <div>

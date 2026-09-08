@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
+import { PROGRAMME_SLUGS } from "@/lib/programmes";
 
 /**
  * Catalog queries for BUNDLES — the unit of sale. Students buy one
@@ -133,12 +134,18 @@ export async function getPublishedResourceBySlug(slug: string) {
       course: true,
       programme: true,
       bundle: { select: { id: true, title: true, slug: true, pricePesewas: true } },
+      files: {
+        where: { isCurrent: true },
+        select: { sizeBytes: true },
+        take: 1,
+      },
     },
   });
 }
 
 export async function getProgrammes() {
   return prisma.programme.findMany({
+    where: { slug: { in: PROGRAMME_SLUGS } },
     orderBy: { name: "asc" },
     include: { _count: { select: { bundles: { where: { status: "PUBLISHED" } } } } },
   });
@@ -154,6 +161,47 @@ export async function getFilterYears(): Promise<string[]> {
   return rows.map((r) => r.academicYear);
 }
 
+/**
+ * Free downloadable materials (slides, notes, revision packs) — published
+ * resources that belong to NO sale bundle. Optionally filtered to a
+ * programme track + level + semester, matching the guided browse flow.
+ */
+export async function getFreeMaterials(filters: {
+  programme?: string;
+  level?: number;
+  semester?: number;
+}) {
+  const where: Prisma.ResourceWhereInput = {
+    status: "PUBLISHED",
+    bundleId: null,
+  };
+  if (filters.programme) where.programme = { is: { slug: filters.programme } };
+  if (filters.level) where.level = filters.level;
+  if (filters.semester) where.semester = filters.semester;
+
+  return prisma.resource.findMany({
+    where,
+    orderBy: [{ course: { code: "asc" } }, { semester: "asc" }, { title: "asc" }],
+    include: {
+      course: true,
+      programme: true,
+      files: {
+        where: { isCurrent: true },
+        select: { id: true, sizeBytes: true },
+        take: 1,
+      },
+    },
+  });
+}
+
+export type FreeMaterial = Awaited<ReturnType<typeof getFreeMaterials>>[number];
+
 export function formatPrice(pesewas: number): string {
   return `GH₵${(pesewas / 100).toFixed(2)}`;
+}
+
+export function formatBytes(bytes: number | null | undefined): string {
+  if (!bytes) return "";
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }

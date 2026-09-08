@@ -3,30 +3,32 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-// Sensible defaults for the single-institution MVP (spec: fixed institution).
+// Sensible defaults for the single-institution MVP: three programme
+// tracks (BTECH / Dip Tech / HND), levels 100–400.
 const PROGRAMMES = [
-  { name: "BSc Information Technology", slug: "bsc-information-technology" },
-  { name: "BSc Computer Science", slug: "bsc-computer-science" },
-  { name: "BSc Business Administration", slug: "bsc-business-administration" },
-  { name: "BSc Statistics", slug: "bsc-statistics" },
+  { name: "Bachelor of Technology (BTECH)", slug: "btech" },
+  { name: "Diploma in Technology (Dip Tech)", slug: "dip-tech" },
+  { name: "Higher National Diploma (HND)", slug: "hnd" },
 ];
 
 const COURSES = [
   { code: "ICT 201", title: "Database Systems", slug: "ict-201-database-systems" },
+  { code: "ICT 205", title: "Computer Networks", slug: "ict-205-computer-networks" },
   { code: "ICT 401", title: "Advanced Database Systems", slug: "ict-401-advanced-database-systems" },
-  { code: "CS 305", title: "Database Management", slug: "cs-305-database-management" },
   { code: "STAT 202", title: "Statistics II", slug: "stat-202-statistics-ii" },
   { code: "BUS 101", title: "Introduction to Business", slug: "bus-101-introduction-to-business" },
+  { code: "CS 305", title: "Database Management", slug: "cs-305-database-management" },
 ];
 
 // Bundles are the unit of sale — one per course + academic year, priced as a
-// whole. Papers inside a bundle are never sold individually.
+// whole. Papers inside a bundle are never sold individually. Each bundle is
+// tagged with its programme track and level; papers carry the semester.
 const BUNDLES = [
   {
     slug: "ict-201-database-systems-2024-2025",
     title: "ICT 201 — Database Systems · 2024/2025 Past Questions",
     course: "ICT 201",
-    programme: "bsc-information-technology",
+    programme: "btech",
     level: 200,
     academicYear: "2024/2025",
     pricePesewas: 2500,
@@ -48,10 +50,35 @@ const BUNDLES = [
     ],
   },
   {
+    slug: "ict-205-computer-networks-2024-2025",
+    title: "ICT 205 — Computer Networks · 2024/2025 Past Questions",
+    course: "ICT 205",
+    programme: "btech",
+    level: 200,
+    academicYear: "2024/2025",
+    pricePesewas: 2500,
+    description:
+      "OSI and TCP/IP models, routing, switching, network security, and wireless networking — both semesters included.",
+    papers: [
+      {
+        slug: "ict-205-computer-networks-2024-2025-sem1-exam",
+        title: "ICT 205 — Computer Networks · Semester 1 Exam",
+        semester: 1,
+        pageCount: 26,
+      },
+      {
+        slug: "ict-205-computer-networks-2024-2025-sem2-exam",
+        title: "ICT 205 — Computer Networks · Semester 2 Exam",
+        semester: 2,
+        pageCount: 21,
+      },
+    ],
+  },
+  {
     slug: "stat-202-statistics-ii-2023-2024",
     title: "STAT 202 — Statistics II · 2023/2024 Past Questions",
     course: "STAT 202",
-    programme: "bsc-statistics",
+    programme: "dip-tech",
     level: 200,
     academicYear: "2023/2024",
     pricePesewas: 2000,
@@ -70,7 +97,7 @@ const BUNDLES = [
     slug: "ict-401-advanced-database-systems-2024-2025",
     title: "ICT 401 — Advanced Database Systems · 2024/2025 Past Questions",
     course: "ICT 401",
-    programme: "bsc-information-technology",
+    programme: "btech",
     level: 400,
     academicYear: "2024/2025",
     pricePesewas: 3000,
@@ -89,7 +116,7 @@ const BUNDLES = [
     slug: "bus-101-introduction-to-business-2025-2026",
     title: "BUS 101 — Introduction to Business · 2025/2026 Past Questions",
     course: "BUS 101",
-    programme: "bsc-business-administration",
+    programme: "btech",
     level: 100,
     academicYear: "2025/2026",
     pricePesewas: 1500,
@@ -101,6 +128,25 @@ const BUNDLES = [
         title: "BUS 101 — Introduction to Business · Semester 1 Exam",
         semester: 1,
         pageCount: 18,
+      },
+    ],
+  },
+  {
+    slug: "cs-305-database-management-2024-2025",
+    title: "CS 305 — Database Management · 2024/2025 Past Questions",
+    course: "CS 305",
+    programme: "hnd",
+    level: 300,
+    academicYear: "2024/2025",
+    pricePesewas: 2200,
+    description:
+      "Data modelling, SQL, normalisation and database administration questions from both semesters.",
+    papers: [
+      {
+        slug: "cs-305-database-management-2024-2025-sem1-exam",
+        title: "CS 305 — Database Management · Semester 1 Exam",
+        semester: 1,
+        pageCount: 24,
       },
     ],
   },

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getPopularBundles, getRecentBundles } from "@/lib/resources";
 import { BundleCard } from "@/components/bundle-card";
 import { PaperStack } from "@/components/paper-stack";
+import { BrowsePicker } from "@/components/browse-picker";
 
 export default async function HomePage() {
   const [popular, recent] = await Promise.all([
@@ -110,6 +111,22 @@ export default async function HomePage() {
               </p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Guided browse picker — programme → level → semester */}
+      <section className="container-page py-12">
+        <div className="mx-auto max-w-3xl">
+          <h2 className="text-center text-xl font-bold tracking-tight text-neutral-900">
+            Find your past questions
+          </h2>
+          <p className="mx-auto mt-1 max-w-md text-center text-sm text-neutral-500">
+            Pick your programme, year, and semester — see the courses you
+            can pay for, plus free study materials.
+          </p>
+          <div className="mt-6">
+            <BrowsePicker />
+          </div>
         </div>
       </section>
 

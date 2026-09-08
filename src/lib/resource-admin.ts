@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/db";
-import { buildStorageKey, putObject, getObjectHead } from "@/lib/storage";
+import { buildStorageKey, putObject, getObjectHead, ensureBucket } from "@/lib/storage";
 import { createHash } from "crypto";
 import { z } from "zod";
+import { currentAcademicYear } from "@/lib/programmes";
 
 // ─────────────────────────────────────────────────────────────────
 // Constants
@@ -30,8 +31,8 @@ export const bundleFormSchema = z.object({
   level: z.coerce
     .number()
     .int("Level must be a whole number.")
-    .min(100, "Level must be 100–800.")
-    .max(800, "Level must be 100–800."),
+    .min(100, "Level must be 100–400.")
+    .max(400, "Level must be 100–400."),
   academicYear: z
     .string()
     .trim()
@@ -58,6 +59,49 @@ export const bundleFormSchema = z.object({
 });
 
 export type BundleFormInput = z.infer<typeof bundleFormSchema>;
+
+/** Metadata for a FREE downloadable material (slides, notes, revision). */
+export const freeMaterialFormSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(6, "Title must be at least 6 characters.")
+    .max(160, "Title must be at most 160 characters."),
+  description: z
+    .string()
+    .trim()
+    .max(2000, "Description must be at most 2000 characters.")
+    .optional()
+    .transform((v) => v || undefined),
+  type: z.enum(["LECTURE_NOTES", "SLIDES", "REVISION", "PRACTICE"]),
+  level: z.coerce
+    .number()
+    .int("Level must be a whole number.")
+    .min(100, "Level must be 100–400.")
+    .max(400, "Level must be 100–400."),
+  semester: z.coerce
+    .number()
+    .int()
+    .min(1, "Semester must be 1 or 2.")
+    .max(2, "Semester must be 1 or 2."),
+  courseCode: z
+    .string()
+    .trim()
+    .min(2, "Course code is required (e.g. ICT 201).")
+    .max(20, "Course code must be at most 20 characters."),
+  courseTitle: z
+    .string()
+    .trim()
+    .min(3, "Course title is required (e.g. Database Systems).")
+    .max(120, "Course title must be at most 120 characters."),
+  programmeName: z
+    .string()
+    .trim()
+    .min(2, "Programme is required.")
+    .max(120, "Programme must be at most 120 characters."),
+});
+
+export type FreeMaterialFormInput = z.infer<typeof freeMaterialFormSchema>;
 
 export function formatZodIssues(error: z.ZodError): string {
   return error.issues.map((i) => i.message).join(" ");
@@ -230,6 +274,99 @@ export interface BulkUploadResult {
     slug: string;
     pageCount: number;
   }[];
+}
+
+export interface FreeMaterialUploadResult {
+  resourceId: string;
+  slug: string;
+  title: string;
+}
+
+/**
+ * Uploads ONE free material (slides / notes / revision pack) that is NOT
+ * part of any sale bundle. Stored like any other resource — same PDF
+ * sniffing, S3 object, and ResourceFile row — but with no bundle, status
+ * PUBLISHED immediately, and served through the public download route.
+ */
+export async function uploadFreeMaterial(input: {
+  file: File;
+  adminId: string;
+  material: FreeMaterialFormInput;
+}): Promise<FreeMaterialUploadResult> {
+  if (input.file.size === 0) {
+    throw new Error("Choose a PDF file to upload.");
+  }
+  if (input.file.size > MAX_UPLOAD_BYTES) {
+    throw new Error(
+      `"${input.file.name}" is too large (${(input.file.size / 1024 / 1024).toFixed(1)} MB) — the limit is 30 MB.`,
+    );
+  }
+
+  const buf = Buffer.from(await input.file.arrayBuffer());
+  const validated = validatePdf(input.file, buf);
+  if (validated.pageCount > MAX_PAGES) {
+    throw new Error(
+      `"${input.file.name}" has ${validated.pageCount} pages — the limit is ${MAX_PAGES}.`,
+    );
+  }
+
+  const course = await upsertCourse(
+    input.material.courseCode,
+    input.material.courseTitle,
+  );
+  const programme = await prisma.programme.findUnique({
+    where: { name: input.material.programmeName },
+    select: { id: true },
+  });
+  if (!programme) {
+    throw new Error(`Unknown programme: ${input.material.programmeName}`);
+  }
+
+  const title =
+    input.material.title.trim() || titleFromFileName(input.file.name, input.material.courseTitle);
+  const slug = await uniqueResourceSlug(title);
+
+  await ensureBucket();
+  await putObject(validated.storageKey, validated.buf, "application/pdf");
+
+  const resource = await prisma.resource.create({
+    data: {
+      slug,
+      title,
+      description: input.material.description,
+      type: input.material.type,
+      status: "PUBLISHED",
+      level: input.material.level,
+      semester: input.material.semester,
+      academicYear: currentAcademicYear(),
+      pageCount: validated.pageCount,
+      previewPages: 0,
+      publishedAt: new Date(),
+      courseId: course.id,
+      programmeId: programme.id,
+      files: {
+        create: {
+          storageKey: validated.storageKey,
+          mimeType: "application/pdf",
+          sizeBytes: validated.buf.length,
+          checksum: validated.checksum,
+          originalName: input.file.name,
+          isCurrent: true,
+        },
+      },
+    },
+    select: { id: true, slug: true, title: true },
+  });
+
+  return { resourceId: resource.id, slug: resource.slug, title: resource.title };
+}
+
+/** Find or create a course row (shared by bundle + free upload paths). */
+async function upsertCourse(code: string, title: string) {
+  const existing = await prisma.course.findUnique({ where: { code } });
+  if (existing) return existing;
+  const slug = await uniqueCourseSlug(code, title);
+  return prisma.course.create({ data: { code, title, slug } });
 }
 
 /**
