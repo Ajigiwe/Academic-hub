@@ -13,12 +13,21 @@ import { makePdf } from "./pdf-factory";
 const TARGET_TITLE = "BUS 101 — Introduction to Business · Semester 1 Exam";
 
 async function main() {
-  const paper = await prisma.resource.findFirst({
-    where: { title: { contains: "BUS 101" }, bundleId: { not: null } },
-    orderBy: { title: "asc" },
-    select: { id: true, title: true, pageCount: true, files: { where: { isCurrent: true }, select: { id: true } } },
-  });
-  if (!paper) throw new Error("No seeded bundle paper matching BUS 101 found.");
+  const paper =
+    (
+      await prisma.resource.findMany({
+        where: { title: { contains: "BUS 101" } },
+        orderBy: { title: "asc" },
+        select: {
+          id: true,
+          title: true,
+          bundleId: true,
+          pageCount: true,
+          files: { where: { isCurrent: true }, select: { id: true } },
+        },
+      })
+    ).find((r) => r.bundleId) ?? null;
+  if (!paper) throw new Error("No published bundle paper matching BUS 101 found.");
 
   if (paper.files.length > 0) {
     console.log("already has a current file — nothing to do");
