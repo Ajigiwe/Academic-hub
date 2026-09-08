@@ -1,18 +1,11 @@
 import Link from "next/link";
-import { getPopularBundles, getRecentBundles } from "@/lib/resources";
-import { BundleCard } from "@/components/bundle-card";
 import { PaperStack } from "@/components/paper-stack";
 import { BrowsePicker } from "@/components/browse-picker";
 
-export default async function HomePage() {
-  const [popular, recent] = await Promise.all([
-    getPopularBundles(6),
-    getRecentBundles(6),
-  ]);
-
+export default function HomePage() {
   return (
     <div>
-      {/* Hero + search (spec §7) */}
+      {/* Hero + intent entry (client flow: choose what you came for) */}
       <section className="relative overflow-hidden border-b border-neutral-200">
         {/* Layered brand backdrop */}
         <div className="absolute inset-0 bg-gradient-to-b from-brand-50 via-white to-neutral-50" />
@@ -48,46 +41,46 @@ export default async function HomePage() {
             </span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base text-neutral-600 sm:text-lg lg:mx-0">
-            Buy a whole year of past questions for your course in one
-            purchase — every paper included.
+            Past questions for your course and year, plus free slides and
+            notes — tell us what you came for and we'll take you there.
           </p>
-          <form action="/search" className="mx-auto mt-7 flex max-w-xl gap-2 lg:mx-0">
-            <div className="relative flex-1">
-              <svg
-                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
-              <input
-                name="q"
-                className="input h-11 pl-10 shadow-md"
-                placeholder="e.g. ICT 201, Database Systems…"
-                aria-label="Search past questions"
-              />
-            </div>
-            <button type="submit" className="btn-primary h-11 shadow-md">
-              Search
-            </button>
-          </form>
-          <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs text-neutral-500 lg:justify-start">
-            <span className="py-1">Try:</span>
-            {["database", "ICT 201", "statistics"].map((t) => (
-              <Link
-                key={t}
-                href={`/search?q=${encodeURIComponent(t)}`}
-                className="rounded-full border border-neutral-200 bg-white px-3 py-1 shadow-sm transition hover:border-brand-300 hover:text-brand-700"
-              >
-                {t}
-              </Link>
-            ))}
+
+          {/* Two doors: the visitor picks their intent immediately */}
+          <div className="mx-auto mt-7 grid max-w-xl gap-3 sm:grid-cols-2 lg:mx-0">
+            <a
+              href="#browse"
+              className="group rounded-xl border border-neutral-200 bg-white p-4 text-left shadow-md transition-all hover:border-brand-500 hover:shadow-lift"
+            >
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-700 text-white">
+                <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                  <path d="M14 2v6h6" />
+                </svg>
+              </span>
+              <p className="mt-2.5 text-sm font-bold text-neutral-900">
+                Past questions
+              </p>
+              <p className="mt-0.5 text-xs text-neutral-600">
+                Exam papers by course & year — for sale.
+              </p>
+            </a>
+            <Link
+              href="/materials"
+              className="group rounded-xl border border-neutral-200 bg-white p-4 text-left shadow-md transition-all hover:border-amber-400 hover:shadow-lift"
+            >
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-amber-500 text-white">
+                <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M7 8h10M7 12h10M7 16h6" />
+                </svg>
+              </span>
+              <p className="mt-2.5 text-sm font-bold text-neutral-900">
+                Course materials
+              </p>
+              <p className="mt-0.5 text-xs text-neutral-600">
+                Slides & notes — free to download.
+              </p>
+            </Link>
           </div>
           </div>
           <PaperStack />
@@ -114,90 +107,22 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Guided browse picker — programme → level → semester */}
-      <section className="container-page py-12">
+      {/* Guided picker — intent → year → semester → programme. The main
+          event of the homepage: no bundles are shown until the visitor
+          declares what they want. */}
+      <section id="browse" className="container-page scroll-mt-20 py-12">
         <div className="mx-auto max-w-3xl">
           <h2 className="text-center text-xl font-bold tracking-tight text-neutral-900">
-            Find your past questions
+            What are you here for?
           </h2>
           <p className="mx-auto mt-1 max-w-md text-center text-sm text-neutral-500">
-            Pick your programme, year, and semester — see the courses you
-            can pay for, plus free study materials.
+            Choose past questions or course materials, then your year,
+            semester, and programme.
           </p>
           <div className="mt-6">
             <BrowsePicker />
           </div>
         </div>
-      </section>
-
-      {/* Popular bundles */}
-      <section className="container-page py-12">
-        <div className="flex items-end justify-between">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-neutral-900">
-              Popular bundles
-            </h2>
-            <p className="mt-0.5 text-sm text-neutral-500">
-              Whole years of past questions students are buying
-            </p>
-          </div>
-          <Link
-            href="/search?sort=popular"
-            className="flex items-center gap-1 text-sm font-semibold text-brand-700 hover:underline"
-          >
-            View all
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M5 12h14" />
-              <path d="m12 5 7 7-7 7" />
-            </svg>
-          </Link>
-        </div>
-        {popular.length === 0 ? (
-          <p className="mt-4 rounded-xl border border-dashed border-neutral-300 bg-white p-8 text-center text-sm text-neutral-500">
-            The catalog is being stocked. Check back soon.
-          </p>
-        ) : (
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {popular.map((b) => (
-              <BundleCard key={b.id} bundle={b} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Recently added bundles */}
-      <section className="container-page pb-12">
-        <div className="flex items-end justify-between">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-neutral-900">
-              Recently added
-            </h2>
-            <p className="mt-0.5 text-sm text-neutral-500">
-              New year bundles from the archive
-            </p>
-          </div>
-          <Link
-            href="/search?sort=newest"
-            className="flex items-center gap-1 text-sm font-semibold text-brand-700 hover:underline"
-          >
-            View all
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M5 12h14" />
-              <path d="m12 5 7 7-7 7" />
-            </svg>
-          </Link>
-        </div>
-        {recent.length === 0 ? (
-          <p className="mt-4 rounded-xl border border-dashed border-neutral-300 bg-white p-8 text-center text-sm text-neutral-500">
-            New resources will appear here.
-          </p>
-        ) : (
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {recent.map((b) => (
-              <BundleCard key={b.id} bundle={b} />
-            ))}
-          </div>
-        )}
       </section>
 
       {/* How it works */}
@@ -207,7 +132,7 @@ export default async function HomePage() {
             How it works
           </h2>
           <p className="mx-auto mt-1 max-w-md text-center text-sm text-neutral-500">
-            From search to study in three steps
+            From choice to study in a few taps
           </p>
           <div className="mt-10 grid gap-8 sm:grid-cols-3">
             {[
@@ -215,12 +140,12 @@ export default async function HomePage() {
                 n: "1",
                 icon: (
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="m21 21-4.3-4.3" />
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                    <path d="M14 2v6h6" />
                   </svg>
                 ),
-                title: "Find",
-                text: "Search by course, programme, level, semester, or year.",
+                title: "Choose",
+                text: "Pick past questions or free materials, then your year, semester, and programme.",
               },
               {
                 n: "2",
@@ -231,7 +156,7 @@ export default async function HomePage() {
                   </svg>
                 ),
                 title: "Purchase",
-                text: "Pay with Mobile Money or card through secure checkout.",
+                text: "Pay with Mobile Money or card — one price unlocks every paper in a bundle.",
               },
               {
                 n: "3",
