@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PROGRAMMES, LEVELS, type ProgrammeSlug } from "@/lib/programmes";
+import { PROGRAMMES, LEVELS, programmeBySlug, type ProgrammeSlug } from "@/lib/programmes";
 
 type Intent = "papers" | "materials";
 const STEPS: Record<Intent, string[]> = {
@@ -10,12 +10,50 @@ const STEPS: Record<Intent, string[]> = {
   materials: ["Year", "Semester", "Programme"],
 };
 
+const STORAGE_KEY = "arh.browse.v1";
+
+interface SavedChoice {
+  intent: Intent;
+  level: number;
+  semester: number;
+  programme: ProgrammeSlug;
+  savedAt: number;
+}
+
+function loadSaved(): SavedChoice | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<SavedChoice>;
+    const valid =
+      (parsed.intent === "papers" || parsed.intent === "materials") &&
+      (LEVELS as readonly number[]).includes(parsed.level as never) &&
+      (parsed.semester === 1 || parsed.semester === 2) &&
+      !!programmeBySlug(parsed.programme);
+    if (!valid) return null;
+    return parsed as SavedChoice;
+  } catch {
+    return null;
+  }
+}
+
+function saveChoice(c: Omit<SavedChoice, "savedAt">): void {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...c, savedAt: Date.now() } satisfies SavedChoice),
+    );
+  } catch {
+    // Private mode / storage full — remembering is best-effort.
+  }
+}
+
 /**
  * Primary homepage flow. The visitor first declares what they came for —
  * past questions (paid, guided picker → /courses) or course materials
  * like slides (free, → /materials) — then narrows by year, semester,
- * and programme. Order per the client: year first, then semester, then
- * programme, before any products are shown.
+ * and programme. Returning visitors get their last completed selection
+ * prefilled from localStorage as a one-tap "welcome back" shortcut.
  */
 export function BrowsePicker() {
   const router = useRouter();
@@ -24,6 +62,17 @@ export function BrowsePicker() {
   const [level, setLevel] = useState<number | null>(null);
   const [semester, setSemester] = useState<number | null>(null);
   const [programme, setProgramme] = useState<ProgrammeSlug | null>(null);
+
+  // Restored only after mount (localStorage is client-only) — and only
+  // surfaced once, via the welcome-back card.
+  const [saved, setSaved] = useState<SavedChoice | null>(null);
+  const restoredOnce = useRef(false);
+
+  useEffect(() => {
+    if (restoredOnce.current) return;
+    restoredOnce.current = true;
+    setSaved(loadSaved());
+  }, []);
 
   const canNext =
     (step === 0 && level !== null) ||
@@ -35,7 +84,8 @@ export function BrowsePicker() {
       setStep((s) => s + 1);
       return;
     }
-    if (level === null || semester === null || programme === null) return;
+    if (level === null || semester === null || programme === null || intent === null) return;
+    saveChoice({ intent, level, semester, programme });
     const qs = `level=${level}&semester=${semester}&programme=${programme}`;
     router.push(intent === "materials" ? `/materials?${qs}` : `/courses?${qs}`);
   }
@@ -48,10 +98,69 @@ export function BrowsePicker() {
     setProgramme(null);
   }
 
+  /** Jump straight to the results for a saved (or current) selection. */
+  function resumeWith(i: Intent, l: number, s: number, p: ProgrammeSlug) {
+    saveChoice({ intent: i, level: l, semester: s, programme: p });
+    const qs = `level=${l}&semester=${s}&programme=${p}`;
+    router.push(i === "materials" ? `/materials?${qs}` : `/courses?${qs}`);
+  }
+
+  function startFreshWith(i: Intent) {
+    setIntent(i);
+    setStep(0);
+    setLevel(null);
+    setSemester(null);
+    setProgramme(null);
+  }
+
   const stepLabels = intent ? STEPS[intent] : ["Year", "Semester", "Programme"];
+  const savedProgramme = saved ? programmeBySlug(saved.programme) : undefined;
 
   return (
     <div className="card-padded overflow-hidden">
+      {/* ── Welcome back: one-tap resume of the last selection ────── */}
+      {intent === null && saved && (
+        <div className="mb-5 rounded-xl border border-brand-200 bg-brand-50/60 p-4">
+          <p className="text-sm font-semibold text-neutral-900">
+            Welcome back! Last time you looked at
+          </p>
+          <p className="mt-1 text-sm text-neutral-700">
+            <span className="font-semibold">
+              {saved.intent === "papers" ? "Past questions" : "Course materials"}
+            </span>{" "}
+            · Level {saved.level} ·{" "}
+            {saved.semester === 1 ? "First" : "Second"} Semester ·{" "}
+            {savedProgramme?.short ?? saved.programme}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => resumeWith(saved.intent, saved.level, saved.semester, saved.programme)}
+              className="btn-primary btn-sm"
+            >
+              Show that again →
+            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  // Same filters, other content type.
+                  resumeWith(
+                    saved.intent === "papers" ? "materials" : "papers",
+                    saved.level,
+                    saved.semester,
+                    saved.programme,
+                  );
+                }}
+                className="btn-secondary btn-sm"
+              >
+                Same filters, {saved.intent === "papers" ? "materials" : "past questions"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Intent choice ─────────────────────────────────────────── */}
       {intent === null ? (
         <div>
@@ -64,10 +173,7 @@ export function BrowsePicker() {
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <button
               type="button"
-              onClick={() => {
-                setIntent("papers");
-                setStep(0);
-              }}
+              onClick={() => startFreshWith("papers")}
               className="group rounded-xl border-2 border-neutral-200 bg-white p-5 text-left transition-all hover:border-brand-500 hover:shadow-card"
             >
               <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-50 text-brand-700 transition-colors group-hover:bg-brand-700 group-hover:text-white">
@@ -91,10 +197,7 @@ export function BrowsePicker() {
 
             <button
               type="button"
-              onClick={() => {
-                setIntent("materials");
-                setStep(0);
-              }}
+              onClick={() => startFreshWith("materials")}
               className="group rounded-xl border-2 border-neutral-200 bg-white p-5 text-left transition-all hover:border-brand-500 hover:shadow-card"
             >
               <span className="grid h-11 w-11 place-items-center rounded-xl bg-amber-50 text-amber-700 transition-colors group-hover:bg-amber-500 group-hover:text-white">
