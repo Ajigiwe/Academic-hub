@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { signPayload } from "@/lib/payments";
+import { getAppOrigin } from "@/lib/app-url";
 
 /**
  * Mock gateway "server". Simulates what a real provider does:
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing ref or outcome." }, { status: 400 });
   }
 
-  const appUrl = new URL(req.url).origin;
+  const appUrl = getAppOrigin(req);
   const callbackBase =
     process.env.NEXT_PUBLIC_PAYMENT_RETURN_URL ?? `${appUrl}/api/payments/verify`;
 

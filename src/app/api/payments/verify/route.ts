@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { processSuccessfulPayment } from "@/lib/payment-processing";
+import { getAppOrigin } from "@/lib/app-url";
 import { NextResponse } from "next/server";
 
 /**
@@ -13,7 +14,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const reference = url.searchParams.get("ref");
 
-  const appUrl = url.origin;
+  const appUrl = getAppOrigin(req);
   const fail = (reason: string) =>
     NextResponse.redirect(`${appUrl}/payment/result?status=failed&reason=${encodeURIComponent(reason)}`);
 

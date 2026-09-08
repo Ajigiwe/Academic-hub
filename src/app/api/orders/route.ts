@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { createOrderSchema } from "@/lib/validation";
 import { getPaymentProvider } from "@/lib/payments";
+import { getAppOrigin } from "@/lib/app-url";
 import { NextResponse } from "next/server";
 
 function generateOrderReference(): string {
@@ -101,7 +102,7 @@ export async function POST(req: Request) {
   const provider = getPaymentProvider();
   // Single-origin app: the request's own origin is always the correct
   // base for callbacks/redirects (dev ports, previews, production).
-  const appUrl = new URL(req.url).origin;
+  const appUrl = getAppOrigin(req);
   const callbackUrl = `${appUrl}/api/payments/verify?ref=${encodeURIComponent(order.reference)}`;
 
   try {
