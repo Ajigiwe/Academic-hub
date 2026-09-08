@@ -11,7 +11,6 @@ const fraunces = localFont({
 });
 import { getCurrentUser } from "@/lib/auth";
 import { SiteHeader } from "@/components/site-header";
-import { SiteFooter } from "@/components/site-footer";
 import { MobileNav } from "@/components/mobile-nav";
 import { RegisterServiceWorker } from "@/components/register-sw";
 
@@ -57,7 +56,6 @@ export default async function RootLayout({
         <RegisterServiceWorker />
         <SiteHeader user={user} />
         <main className="flex-1 pb-20 md:pb-0">{children}</main>
-        <SiteFooter />
         <MobileNav isAuthed={user !== null} isAdmin={user?.role === "ADMIN"} />
       </body>
     </html>
