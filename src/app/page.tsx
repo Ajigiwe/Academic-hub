@@ -87,26 +87,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Trust band */}
-      <section className="border-b border-neutral-200 bg-white">
-        <div className="container-page grid grid-cols-3 divide-x divide-neutral-100 py-6 text-center">
-          {[
-            { value: "100%", label: "Official past papers" },
-            { value: "< 1 min", label: "From payment to reading" },
-            { value: "GH₵5+", label: "Student-friendly pricing" },
-          ].map((s) => (
-            <div key={s.label}>
-              <p className="font-display text-xl font-extrabold tracking-[-0.03em] text-brand-800 sm:text-2xl">
-                {s.value}
-              </p>
-              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-neutral-600">
-                {s.label}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* Guided picker — intent → year → semester → programme. The main
           event of the homepage: no bundles are shown until the visitor
           declares what they want. */}
@@ -121,67 +101,6 @@ export default function HomePage() {
           </p>
           <div className="mt-6">
             <BrowsePicker />
-          </div>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="border-t border-neutral-200 bg-white py-14">
-        <div className="container-page">
-          <h2 className="text-center text-xl font-bold tracking-tight text-neutral-900">
-            How it works
-          </h2>
-          <p className="mx-auto mt-1 max-w-md text-center text-sm text-neutral-500">
-            From choice to study in a few taps
-          </p>
-          <div className="mt-10 grid gap-8 sm:grid-cols-3">
-            {[
-              {
-                n: "1",
-                icon: (
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                    <path d="M14 2v6h6" />
-                  </svg>
-                ),
-                title: "Choose",
-                text: "Pick past questions or free materials, then your year, semester, and programme.",
-              },
-              {
-                n: "2",
-                icon: (
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <rect x="2" y="5" width="20" height="14" rx="2" />
-                    <path d="M2 10h20" />
-                  </svg>
-                ),
-                title: "Purchase",
-                text: "Pay with Mobile Money or card — one price unlocks every paper in a bundle.",
-              },
-              {
-                n: "3",
-                icon: (
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
-                  </svg>
-                ),
-                title: "Study",
-                text: "Read instantly in your secure in-app library — on any device.",
-              },
-            ].map((s) => (
-              <div key={s.title} className="relative text-center">
-                <div className="relative mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 text-white shadow-card">
-                  {s.icon}
-                  <span className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-gold-400 text-[10px] font-bold text-white shadow-sm">
-                    {s.n}
-                  </span>
-                </div>
-                <h3 className="mt-4 font-semibold text-neutral-900">{s.title}</h3>
-                <p className="mx-auto mt-1 max-w-xs text-sm leading-relaxed text-neutral-600">
-                  {s.text}
-                </p>
-              </div>
-            ))}
           </div>
         </div>
       </section>

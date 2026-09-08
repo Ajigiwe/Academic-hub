@@ -13,7 +13,7 @@ export function SiteFooter() {
 
   return (
     <footer className="border-t border-neutral-200 bg-neutral-100">
-      <div className="container-page grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="container-page grid gap-10 py-12 sm:grid-cols-3">
         <div>
           <Logo className="text-base" />
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-neutral-600">
@@ -31,28 +31,6 @@ export function SiteFooter() {
             <li><Link href="/search" className="transition-colors hover:text-brand-700">Search</Link></li>
             <li><Link href="/library" className="transition-colors hover:text-brand-700">My Library</Link></li>
           </ul>
-        </div>
-
-        <div className="text-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-            Newsletter
-          </p>
-          <p className="mt-3 text-neutral-600">
-            New past questions and study tips, monthly.
-          </p>
-          <form action="/help?subscribed=1" className="mt-3 flex gap-2">
-            <input
-              type="email"
-              name="email"
-              required
-              placeholder="you@example.com"
-              aria-label="Email address"
-              className="input py-2"
-            />
-            <button type="submit" className="btn-primary btn-sm shrink-0">
-              Join
-            </button>
-          </form>
         </div>
 
         <div className="text-sm">
