@@ -64,7 +64,7 @@ export default async function SearchPage({
           : null}
       </p>
 
-      <div className="mt-6 grid gap-8 lg:grid-cols-[260px_1fr]">
+      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[260px_1fr]">
         {/* Filters (collapsible) */}
         <form className="card h-fit overflow-hidden self-start" action="/search">
           <FilterPanel activeCount={activeFilterCount}>

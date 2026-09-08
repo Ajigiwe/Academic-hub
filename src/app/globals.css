@@ -82,7 +82,9 @@
     @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-neutral-600;
   }
   .input {
-    @apply w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 placeholder-neutral-400 shadow-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20;
+    /* 16px minimum: iOS zooms any focused input below 16px, and the zoom
+       persists across navigations, making pages look oversized on phones. */
+    @apply w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-base text-neutral-900 placeholder-neutral-400 shadow-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20;
   }
 
   /* Surfaces */

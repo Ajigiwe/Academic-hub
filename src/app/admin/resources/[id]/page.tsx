@@ -87,7 +87,7 @@ export default async function AdminResourceEditPage({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-5">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* ── Metadata form (wider column) ─────────────────────── */}
         <section className="card p-5 lg:col-span-3">
           <h2 className="text-base font-semibold text-neutral-900">

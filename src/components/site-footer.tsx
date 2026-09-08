@@ -47,7 +47,7 @@ export function SiteFooter() {
               required
               placeholder="you@example.com"
               aria-label="Email address"
-              className="input py-2 text-sm"
+              className="input py-2"
             />
             <button type="submit" className="btn-primary btn-sm shrink-0">
               Join

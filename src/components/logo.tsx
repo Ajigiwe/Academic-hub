@@ -53,7 +53,9 @@ export function Logo({
           <span style={{ color: light ? "#ffffff" : BLUE }}>Hub</span>
         </span>
         {tagline && (
-          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">
+          // Hidden on phones — the ~290px unbreakable tagline plus mark and
+          // actions exceeds a 375px viewport and forces horizontal scroll.
+          <span className="hidden text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600 min-[480px]:block">
             Past Questions. Smarter Preparation.
           </span>
         )}

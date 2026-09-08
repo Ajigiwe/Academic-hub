@@ -63,7 +63,7 @@ export default async function ResourceDetailPage({
           <span className="text-neutral-700">{resource.course.code}</span>
         </nav>
 
-        <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
           {/* Main column */}
           <div>
             <div className="flex flex-wrap items-center gap-1.5">
