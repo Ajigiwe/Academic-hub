@@ -1,6 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  cachePageImage,
+  isSavedOffline,
+  offlineSupported,
+  pageCachedOffline,
+  writeOfflineMeta,
+} from "@/lib/offline";
 
 interface DocumentViewerProps {
   slug: string;
@@ -90,6 +97,50 @@ export function DocumentViewer({
   // callers share one request.
   const pageRequests = useRef<Map<number, Promise<string>>>(new Map());
 
+  /** Fetches one watermarked page image (token mint + GET). */
+  const fetchPageResponse = useCallback(
+    async (pageNumber: number): Promise<Response> => {
+      // Mint a page token, restarting the session once if the 10-min window lapsed.
+      const mint = async (): Promise<string> => {
+        const tokenRes = await fetch(`/api/viewer/${slug}/pages/${pageNumber}`, {
+          method: "POST",
+        });
+        if (tokenRes.status === 428) {
+          // Session window lapsed — restart once and redo the mint.
+          sessionPromise.current = null;
+          await ensureSession();
+          const retry = await fetch(`/api/viewer/${slug}/pages/${pageNumber}`, {
+            method: "POST",
+          });
+          if (!retry.ok) throw new Error("session");
+          return ((await retry.json()) as { token: string }).token;
+        }
+        if (!tokenRes.ok) {
+          const data = (await tokenRes.json().catch(() => ({}))) as { error?: string };
+          if (tokenRes.status === 403) {
+            setError({ kind: "denied", message: data.error ?? "You do not have access." });
+          }
+          throw new Error(data.error ?? "Could not open this page.");
+        }
+        return ((await tokenRes.json()) as { token: string }).token;
+      };
+
+      const token = await mint();
+      const imgRes = await fetch(
+        `/api/viewer/${slug}/pages/${pageNumber}?t=${encodeURIComponent(token)}`,
+      );
+      if (!imgRes.ok) {
+        const data = (await imgRes.json().catch(() => ({}))) as { error?: string };
+        if (imgRes.status === 403) {
+          setError({ kind: "denied", message: data.error ?? "You do not have access." });
+        }
+        throw new Error(data.error ?? "Could not render this page.");
+      }
+      return imgRes;
+    },
+    [slug, ensureSession],
+  );
+
   const getPageUrl = useCallback(
     (pageNumber: number): Promise<string> => {
       const existing = pageRequests.current.get(pageNumber);
@@ -104,29 +155,11 @@ export function DocumentViewer({
           return next;
         });
         try {
-          const tokenRes = await fetch(`/api/viewer/${slug}/pages/${pageNumber}`, {
-            method: "POST",
-          });
-          if (tokenRes.status === 428) {
-            // Session window lapsed — restart once and redo the mint.
-            sessionPromise.current = null;
-            await ensureSession();
-            const retry = await fetch(`/api/viewer/${slug}/pages/${pageNumber}`, {
-              method: "POST",
-            });
-            if (!retry.ok) throw new Error("session");
-            const { token: retryToken } = (await retry.json()) as { token: string };
-            return await fetchImage(retryToken, pageNumber);
-          }
-          if (!tokenRes.ok) {
-            const data = (await tokenRes.json().catch(() => ({}))) as { error?: string };
-            if (tokenRes.status === 403) {
-              setError({ kind: "denied", message: data.error ?? "You do not have access." });
-            }
-            throw new Error(data.error ?? "Could not open this page.");
-          }
-          const { token } = (await tokenRes.json()) as { token: string };
-          return await fetchImage(token, pageNumber);
+          const imgRes = await fetchPageResponse(pageNumber);
+          const blob = await imgRes.blob();
+          const url = URL.createObjectURL(blob);
+          setPageUrls((prev) => new Map(prev).set(pageNumber, url));
+          return url;
         } finally {
           setLoadingPages((prev) => {
             const next = new Set(prev);
@@ -144,26 +177,8 @@ export function DocumentViewer({
       promise.catch(() => pageRequests.current.delete(pageNumber));
       return promise;
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [slug, ensureSession],
+    [fetchPageResponse, ensureSession],
   );
-
-  async function fetchImage(token: string, pageNumber: number): Promise<string> {
-    const imgRes = await fetch(
-      `/api/viewer/${slug}/pages/${pageNumber}?t=${encodeURIComponent(token)}`,
-    );
-    if (!imgRes.ok) {
-      const data = (await imgRes.json().catch(() => ({}))) as { error?: string };
-      if (imgRes.status === 403) {
-        setError({ kind: "denied", message: data.error ?? "You do not have access." });
-      }
-      throw new Error(data.error ?? "Could not render this page.");
-    }
-    const blob = await imgRes.blob();
-    const url = URL.createObjectURL(blob);
-    setPageUrls((prev) => new Map(prev).set(pageNumber, url));
-    return url;
-  }
 
   const retryPage = useCallback(
     (pageNumber: number) => {
@@ -172,6 +187,56 @@ export function DocumentViewer({
     },
     [getPageUrl],
   );
+
+  // ── Save for offline (PWA) ───────────────────────────────────────
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [saveProgress, setSaveProgress] = useState(0);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // caches API is browser-only; gate rendering behind mount to avoid SSR
+  // hydration mismatch (server sees offlineSupported() === false).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!offlineSupported()) return;
+    let cancelled = false;
+    void isSavedOffline(slug).then((saved) => {
+      if (!cancelled && saved) setSaveState("saved");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  async function saveForOffline() {
+    if (saveState !== "idle" || !offlineSupported()) return;
+    setSaveState("saving");
+    setSaveProgress(0);
+    setSaveError(null);
+    try {
+      for (let n = 1; n <= total; n++) {
+        if (!(await pageCachedOffline(slug, n))) {
+          const res = await fetchPageResponse(n);
+          await cachePageImage(slug, n, res);
+        }
+        setSaveProgress(n);
+      }
+      await writeOfflineMeta({
+        slug,
+        title,
+        pageCount: total,
+        savedAt: new Date().toISOString(),
+      });
+      setSaveState("saved");
+    } catch {
+      setSaveState("idle");
+      setSaveError(
+        "Could not finish saving this paper for offline. Check your connection and try again.",
+      );
+    }
+  }
 
   // ── Mode handling ────────────────────────────────────────────────
   // Restore persisted mode after mount (avoids SSR markup mismatch).
@@ -430,9 +495,9 @@ export function DocumentViewer({
         style={{ aspectRatio: "1 / 1.414" }}
       >
         {loading ? (
-          <div className="flex flex-col items-center gap-3 text-neutral-400">
+          <div className="flex flex-col items-center gap-3 text-neutral-500">
             <span className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-200 border-t-brand-600" />
-            <p className="text-xs font-medium uppercase tracking-widest">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">
               Rendering page…
             </p>
           </div>
@@ -447,7 +512,7 @@ export function DocumentViewer({
             </button>
           </div>
         ) : (
-          <p className="text-xs font-medium uppercase tracking-widest text-neutral-300">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
             Page {pageNumber}
           </p>
         )}
@@ -461,6 +526,34 @@ export function DocumentViewer({
       <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-2.5">
         <h1 className="truncate text-sm font-semibold text-neutral-800">{title}</h1>
         <div className="flex items-center gap-1.5">
+          {mounted && offlineSupported() && (
+            <button
+              type="button"
+              onClick={() => void saveForOffline()}
+              disabled={saveState !== "idle"}
+              title="Save the rendered pages of this paper to your device so you can read it without an internet connection."
+              className={`btn-sm ${
+                saveState === "saved" ? "btn-secondary" : "btn-ghost"
+              }`}
+            >
+              {saveState === "saving" ? (
+                <span className="tabular-nums">
+                  Saving… {saveProgress}/{total}
+                </span>
+              ) : saveState === "saved" ? (
+                <span className="text-brand-700">✓ Saved offline</span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M12 3v12" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M5 21h14" />
+                  </svg>
+                  Save offline
+                </span>
+              )}
+            </button>
+          )}
           {/* Mode toggle */}
           <div className="flex overflow-hidden rounded-lg border border-neutral-200" role="group" aria-label="Reading mode">
             <button
@@ -523,6 +616,13 @@ export function DocumentViewer({
           </button>
         </div>
       </div>
+
+      {/* Save error banner */}
+      {saveError && (
+        <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-700">
+          {saveError}
+        </div>
+      )}
 
       {/* Progress bar */}
       <div className="h-1 w-full bg-neutral-200">

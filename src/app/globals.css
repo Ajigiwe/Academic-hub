@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 @theme {
+  /* Type — Fraunces display serif for headings, system sans for body */
+  --font-display: var(--font-fraunces), ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
   /* Brand — deep navy primary (#0b2d5b), bright blue accent (#2563eb) */
   --color-brand-50: #eef4ff;
   --color-brand-100: #dbe7fe;
@@ -29,9 +34,15 @@
   body {
     @apply bg-neutral-50 text-neutral-900 antialiased;
   }
-  h1, h2, h3, h4 {
-    @apply tracking-tight;
+  /* Headings: display serif with a stepped tracking scale — the tighter
+     the level, the larger the display size it targets. */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
   }
+  h1 { letter-spacing: -0.035em; }
+  h2 { letter-spacing: -0.028em; }
+  h3, h4, h5, h6 { letter-spacing: -0.02em; }
+  p { text-wrap: pretty; }
 }
 
 @layer components {

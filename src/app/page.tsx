@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getPopularBundles, getRecentBundles } from "@/lib/resources";
 import { BundleCard } from "@/components/bundle-card";
+import { PaperStack } from "@/components/paper-stack";
 
 export default async function HomePage() {
   const [popular, recent] = await Promise.all([
@@ -19,24 +20,37 @@ export default async function HomePage() {
           className="absolute inset-0 opacity-[0.35]"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 15% 20%, rgb(2 122 72 / 0.08) 0, transparent 40%), radial-gradient(circle at 85% 10%, rgb(247 144 9 / 0.08) 0, transparent 45%)",
+              "radial-gradient(circle at 15% 20%, rgb(37 99 235 / 0.08) 0, transparent 40%), radial-gradient(circle at 85% 10%, rgb(11 45 91 / 0.08) 0, transparent 45%)",
           }}
         />
-        <div className="container-page relative py-14 text-center sm:py-20">
+        <div className="container-page relative grid items-center gap-10 py-14 sm:py-16 lg:grid-cols-[1.08fr_0.92fr] lg:gap-8 lg:py-20">
+          <div className="text-center lg:text-left">
           <span className="badge badge-brand mb-5 px-3 py-1 shadow-sm">
-            ⚡ Instant access after payment
+            <svg
+              className="mr-1.5 inline h-3.5 w-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+            Instant access after payment
           </span>
-          <h1 className="mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-neutral-900 sm:text-5xl">
+          <h1 className="mx-auto max-w-2xl text-balance text-4xl font-extrabold tracking-[-0.035em] text-neutral-900 sm:text-6xl lg:mx-0">
             Find the Past Questions{" "}
             <span className="bg-gradient-to-r from-brand-700 to-brand-500 bg-clip-text text-transparent">
               You Need.
             </span>
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-base text-neutral-600 sm:text-lg">
+          <p className="mx-auto mt-4 max-w-xl text-base text-neutral-600 sm:text-lg lg:mx-0">
             Buy a whole year of past questions for your course in one
             purchase — every paper included.
           </p>
-          <form action="/search" className="mx-auto mt-7 flex max-w-xl gap-2">
+          <form action="/search" className="mx-auto mt-7 flex max-w-xl gap-2 lg:mx-0">
             <div className="relative flex-1">
               <svg
                 className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -62,7 +76,7 @@ export default async function HomePage() {
               Search
             </button>
           </form>
-          <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs text-neutral-500">
+          <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs text-neutral-500 lg:justify-start">
             <span className="py-1">Try:</span>
             {["database", "ICT 201", "statistics"].map((t) => (
               <Link
@@ -74,6 +88,8 @@ export default async function HomePage() {
               </Link>
             ))}
           </div>
+          </div>
+          <PaperStack />
         </div>
       </section>
 
@@ -86,10 +102,10 @@ export default async function HomePage() {
             { value: "GH₵5+", label: "Student-friendly pricing" },
           ].map((s) => (
             <div key={s.label}>
-              <p className="text-lg font-extrabold tracking-tight text-brand-800 sm:text-xl">
+              <p className="font-display text-xl font-extrabold tracking-[-0.03em] text-brand-800 sm:text-2xl">
                 {s.value}
               </p>
-              <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-neutral-500 sm:text-xs">
+              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-neutral-600">
                 {s.label}
               </p>
             </div>

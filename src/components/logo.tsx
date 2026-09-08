@@ -53,7 +53,7 @@ export function Logo({
           <span style={{ color: light ? "#ffffff" : BLUE }}>Hub</span>
         </span>
         {tagline && (
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">
             Past Questions. Smarter Preparation.
           </span>
         )}

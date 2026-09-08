@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b2d5b">
+<title>Academic Hub — Offline reading</title>
+<!--
+  Self-contained offline hub (no external chunks): lists papers saved for
+  offline reading and pages through their cached, watermarked page images
+  straight from the Cache Storage API. Cache names below are the contract
+  shared with src/lib/offline.ts and public/sw.js — keep in sync.
+-->
+<style>
+  :root {
+    --navy: #0b2d5b;
+    --navy-2: #12296b;
+    --blue: #2563eb;
+    --blue-soft: #eef4ff;
+    --slate: #24417a;
+    --text: #0f172a;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --bg: #f8fafc;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Header ─────────────────────────────────────────────── */
+  header {
+    background: linear-gradient(120deg, var(--navy) 0%, var(--navy-2) 60%, var(--blue) 130%);
+    color: #fff;
+    padding: 18px 20px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 1px 3px rgb(15 23 42 / .25);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand svg { width: 34px; height: 38px; flex: none; }
+  .brand-name { font-size: 17px; font-weight: 800; letter-spacing: -.01em; line-height: 1.1; }
+  .brand-tag {
+    font-size: 9.5px; font-weight: 600; letter-spacing: .13em;
+    text-transform: uppercase; color: #bcd4ff; margin-top: 2px;
+  }
+  .status {
+    flex: none;
+    font-size: 11px; font-weight: 600;
+    background: rgb(255 255 255 / .14);
+    border: 1px solid rgb(255 255 255 / .22);
+    padding: 5px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .status .dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    margin-right: 6px; vertical-align: 1px; background: #34d399;
+  }
+  .status.offline .dot { background: #fb923c; }
+
+  main { max-width: 720px; margin: 0 auto; padding: 20px 16px 80px; }
+
+  .hint {
+    font-size: 13px; color: var(--muted);
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 16px;
+  }
+  .hint strong { color: var(--navy); }
+
+  /* ── Paper list ─────────────────────────────────────────── */
+  .paper {
+    display: flex; align-items: center; gap: 14px;
+    background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 10px;
+    box-shadow: 0 1px 2px rgb(15 23 42 / .05);
+  }
+  .paper-icon {
+    flex: none; width: 40px; height: 48px; border-radius: 8px;
+    background: linear-gradient(150deg, var(--blue), var(--navy));
+    display: grid; place-items: center; color: #fff;
+  }
+  .paper-info { min-width: 0; flex: 1; }
+  .paper-title {
+    font-size: 14.5px; font-weight: 700; line-height: 1.3;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .paper-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  button.open {
+    flex: none; border: 0; cursor: pointer;
+    background: var(--blue); color: #fff; font-weight: 700; font-size: 13px;
+    padding: 8px 14px; border-radius: 9px;
+    transition: background .15s;
+  }
+  button.open:hover { background: var(--navy); }
+  button:disabled { opacity: .55; cursor: default; }
+
+  /* ── Empty state ────────────────────────────────────────── */
+  .empty {
+    text-align: center; padding: 48px 20px; color: var(--muted);
+  }
+  .empty .big { font-size: 40px; margin-bottom: 10px; }
+  .empty h2 { color: var(--text); font-size: 18px; margin: 0 0 6px; }
+  .empty p { font-size: 13.5px; line-height: 1.55; max-width: 420px; margin: 0 auto; }
+  .empty a { color: var(--blue); font-weight: 600; }
+
+  /* ── Reader ─────────────────────────────────────────────── */
+  #reader { display: none; }
+  #reader.active { display: block; }
+  .reader-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    padding: 8px 10px; margin-bottom: 12px;
+  }
+  .reader-bar .r-title {
+    font-size: 13px; font-weight: 700; color: var(--navy);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .reader-bar button {
+    border: 1px solid var(--line); background: #fff; color: var(--text);
+    font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
+    cursor: pointer; flex: none;
+  }
+  .reader-bar button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .reader-bar button:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
+  .reader-bar button.primary:hover:not(:disabled) { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+  .page-shell {
+    background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px; box-shadow: 0 1px 3px rgb(15 23 42 / .06);
+  }
+  .page-shell img {
+    display: block; width: 100%; height: auto; border-radius: 6px;
+    background: #fff;
+  }
+  .page-nav {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    margin-top: 14px;
+  }
+  .page-nav button {
+    border: 1px solid var(--line); background: #fff; color: var(--text);
+    font-size: 14px; font-weight: 600; padding: 8px 18px; border-radius: 9px; cursor: pointer;
+  }
+  .page-nav button:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
+  .page-nav .count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 84px; text-align: center; }
+  .loading-note { text-align: center; color: var(--muted); font-size: 13px; padding: 40px 0; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg viewBox="0 0 120 132" fill="none" aria-hidden="true">
+      <g stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M40 30 L16 90" stroke-width="10"/>
+        <path d="M40 30 L40 90" stroke-width="10"/>
+        <path d="M24 64 L44 64" stroke-width="8.5"/>
+        <path d="M72 22 L72 90" stroke-width="11"/>
+        <path d="M40 58 L72 58" stroke-width="8.5"/>
+        <path d="M8 104 C26 97 44 111 62 102" stroke-width="5"/>
+        <path d="M18 114 C34 108 52 120 70 111" stroke-width="4" opacity="0.85"/>
+      </g>
+    </svg>
+    <div>
+      <div class="brand-name">Academic&nbsp;<span style="color:#93b4fd">Hub</span></div>
+      <div class="brand-tag">Past Questions. Smarter Preparation.</div>
+    </div>
+  </div>
+  <div class="status" id="status"><span class="dot"></span><span id="statusText">Checking…</span></div>
+</header>
+
+<main>
+  <div class="hint" id="hint" hidden>
+    <strong>You're offline.</strong> Saved papers below are stored on this
+    device — open one and read it without a connection. Pages show your
+    name as a security watermark.
+  </div>
+
+  <section id="list"></section>
+
+  <section class="empty" id="empty" hidden>
+    <div class="big" style="color:var(--blue)">
+      <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+        <path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20"/>
+        <path d="M9 7h7" style="stroke-width:1.4"/>
+        <path d="M9 11h5" style="stroke-width:1.4"/>
+      </svg>
+    </div>
+    <h2>No papers saved for offline</h2>
+    <p>
+      Open any paper you own in the viewer and tap
+      <strong>Save offline</strong>. The rendered pages are stored on this
+      device so you can read them here, even without internet.
+    </p>
+    <p style="margin-top:14px"><a href="/" id="goHome">Go to Academic Hub</a></p>
+  </section>
+
+  <section id="reader">
+    <div class="reader-bar">
+      <button id="backBtn">← Back to list</button>
+      <div class="r-title" id="rTitle"></div>
+      <button class="primary" id="webBtn" hidden>Open online ↗</button>
+    </div>
+    <div class="page-shell">
+      <div class="loading-note" id="pageLoading">Loading page…</div>
+      <img id="pageImg" alt="Saved paper page" hidden>
+    </div>
+    <div class="page-nav">
+      <button id="prevBtn">← Previous</button>
+      <span class="count" id="pageCount"></span>
+      <button id="nextBtn">Next →</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var PAGES_CACHE = "arh-pages-v1";
+  var META_CACHE = "arh-meta-v1";
+
+  var listEl = document.getElementById("list");
+  var emptyEl = document.getElementById("empty");
+  var readerEl = document.getElementById("reader");
+  var hintEl = document.getElementById("hint");
+  var statusEl = document.getElementById("status");
+  var statusText = document.getElementById("statusText");
+  var pageImg = document.getElementById("pageImg");
+  var pageLoading = document.getElementById("pageLoading");
+  var rTitle = document.getElementById("rTitle");
+  var pageCountEl = document.getElementById("pageCount");
+  var goHome = document.getElementById("goHome");
+
+  function updateStatus() {
+    var online = navigator.onLine;
+    statusEl.classList.toggle("offline", !online);
+    statusText.textContent = online ? "Online" : "Offline";
+    hintEl.hidden = online;
+    goHome.href = online ? "/" : "#";
+  }
+  window.addEventListener("online", updateStatus);
+  window.addEventListener("offline", updateStatus);
+  updateStatus();
+
+  function pageKey(slug, n) { return "/__offline/" + slug + "/" + n; }
+  function metaKey(slug) { return "/__offline/meta/" + slug; }
+
+  var current = null;      // { slug, title, pageCount }
+  var currentPage = 0;
+  var blobs = {};          // page -> blob URL
+
+  function revokeAll() {
+    Object.keys(blobs).forEach(function (k) {
+      URL.revokeObjectURL(blobs[k]);
+    });
+    blobs = {};
+  }
+
+  function fmtDate(iso) {
+    try { return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); }
+    catch (e) { return ""; }
+  }
+
+  function renderList(papers) {
+    if (!papers.length) {
+      listEl.innerHTML = "";
+      emptyEl.hidden = false;
+      return;
+    }
+    emptyEl.hidden = true;
+    listEl.innerHTML = papers.map(function (p) {
+      return (
+        '<div class="paper">' +
+          '<div class="paper-icon">' +
+            '<svg width="20" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+              '<path d="M4 19.5V6a2 2 0 0 1 2-2h14v14H6.5a2.5 2.5 0 0 0 0 5H20"/>' +
+            '</svg>' +
+          '</div>' +
+          '<div class="paper-info">' +
+            '<div class="paper-title">' + escapeHtml(p.title) + '</div>' +
+            '<div class="paper-meta">' + p.pageCount + ' page' + (p.pageCount === 1 ? "" : "s") + ' · saved ' + fmtDate(p.savedAt) + '</div>' +
+          '</div>' +
+          '<button class="open" data-slug="' + escapeAttr(p.slug) + '">Read</button>' +
+        '</div>'
+      );
+    }).join("");
+    listEl.querySelectorAll("button.open").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var p = papers.find(function (x) { return x.slug === btn.getAttribute("data-slug"); });
+        if (p) openPaper(p);
+      });
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function escapeAttr(s) { return escapeHtml(s); }
+
+  async function loadPaperList() {
+    try {
+      if (typeof caches === "undefined") throw new Error("no-cache");
+      var cache = await caches.open(META_CACHE);
+      var keys = await cache.keys();
+      var papers = [];
+      for (var i = 0; i < keys.length; i++) {
+        var m = keys[i].url.match(/\/__offline\/meta\/([^/]+)$/);
+        if (!m) continue;
+        var res = await cache.match(keys[i]);
+        if (!res) continue;
+        var meta = await res.json().catch(function () { return null; });
+        if (meta && meta.slug && meta.pageCount) {
+          meta.savedAt = meta.savedAt || new Date(0).toISOString();
+          papers.push(meta);
+        }
+      }
+      papers.sort(function (a, b) { return b.savedAt.localeCompare(a.savedAt); });
+      renderList(papers);
+    } catch (err) {
+      listEl.innerHTML = "";
+      emptyEl.hidden = false;
+      document.querySelector(".empty p").innerHTML =
+        "Offline storage is not available in this browser (or it was opened " +
+        "as a direct file). Open the site over HTTPS, save a paper, then " +
+        "come back here when offline.";
+    }
+  }
+
+  async function loadPageImage(slug, n) {
+    if (blobs[n]) return blobs[n];
+    var cache = await caches.open(PAGES_CACHE);
+    var res = await cache.match(pageKey(slug, n));
+    if (!res) return null;
+    var blob = await res.blob();
+    blobs[n] = URL.createObjectURL(blob);
+    return blobs[n];
+  }
+
+  async function showPage(n, prefetch) {
+    if (n < 1 || n > current.pageCount) return;
+    currentPage = n;
+    pageCountEl.textContent = "Page " + n + " of " + current.pageCount;
+    pageImg.hidden = true;
+    pageLoading.hidden = false;
+    var url = await loadPageImage(current.slug, n);
+    if (url) {
+      pageLoading.hidden = true;
+      pageImg.src = url;
+      pageImg.hidden = false;
+    } else {
+      pageLoading.hidden = true;
+      pageLoading.textContent = "This page wasn't saved. Go online and re-save the paper.";
+      pageLoading.hidden = false;
+      pageLoading.style.display = "block";
+    }
+    document.getElementById("prevBtn").disabled = n <= 1;
+    document.getElementById("nextBtn").disabled = n >= current.pageCount;
+    // light prefetch of neighbours
+    if (prefetch) {
+      loadPageImage(current.slug, n + 1).catch(function () {});
+      loadPageImage(current.slug, n - 1).catch(function () {});
+    }
+  }
+
+  function openPaper(meta) {
+    current = meta;
+    currentPage = 0;
+    revokeAll();
+    rTitle.textContent = meta.title;
+    document.getElementById("webBtn").hidden = !navigator.onLine;
+    listEl.hidden = true;
+    emptyEl.hidden = true;
+    readerEl.classList.add("active");
+    showPage(1, true);
+  }
+
+  function closePaper() {
+    current = null;
+    revokeAll();
+    readerEl.classList.remove("active");
+    listEl.hidden = false;
+    loadPaperList();
+  }
+
+  document.getElementById("backBtn").addEventListener("click", closePaper);
+  document.getElementById("prevBtn").addEventListener("click", function () {
+    showPage(currentPage - 1, true);
+  });
+  document.getElementById("nextBtn").addEventListener("click", function () {
+    showPage(currentPage + 1, true);
+  });
+  document.getElementById("webBtn").addEventListener("click", function () {
+    window.location.href = "/viewer/" + current.slug;
+  });
+  document.addEventListener("keydown", function (e) {
+    if (!current) return;
+    if (e.key === "ArrowRight" || e.key === "PageDown") showPage(currentPage + 1, true);
+    else if (e.key === "ArrowLeft" || e.key === "PageUp") showPage(currentPage - 1, true);
+    else if (e.key === "Escape") closePaper();
+  });
+
+  loadPaperList();
+})();
+</script>
+</body>
+</html>

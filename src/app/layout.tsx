@@ -1,5 +1,14 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import "./globals.css";
+
+// Fraunces — academic display serif (variable, optical sizing). Vendored
+// locally so builds never depend on Google Fonts being reachable.
+const fraunces = localFont({
+  src: "./fonts/fraunces-var.woff2",
+  variable: "--font-fraunces",
+  display: "swap",
+});
 import { getCurrentUser } from "@/lib/auth";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -44,7 +53,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body className="flex min-h-screen flex-col">
+      <body className={`${fraunces.variable} flex min-h-screen flex-col`}>
         <RegisterServiceWorker />
         <SiteHeader user={user} />
         <main className="flex-1 pb-20 md:pb-0">{children}</main>
