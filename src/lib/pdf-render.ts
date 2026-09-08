@@ -19,8 +19,13 @@ import { createCanvas, loadImage, type SKRSContext2D } from "@napi-rs/canvas";
 const require_ = createRequire(import.meta.url);
 
 // ─────────────────────────────────────────────────────────────────
-// pdf.js bootstrap (legacy build works outside bundlers)
+// pdf.js bootstrap — bundler-safe fake-worker setup
 // ─────────────────────────────────────────────────────────────────
+// We register the worker module directly (globalThis.pdfjsWorker) so
+// pdf.js never needs to spawn a Worker or resolve workerSrc from disk.
+// This is the pattern pdf.js documents for Node/bundler environments:
+// require.resolve() gets replaced with a numeric module id by Turbopack
+// in the standalone build, which previously crashed path.dirname().
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PdfJsModule = any;
@@ -28,18 +33,20 @@ let pdfjsPromise: Promise<PdfJsModule> | null = null;
 
 async function getPdfjs(): Promise<PdfJsModule> {
   if (!pdfjsPromise) {
-    pdfjsPromise = import("pdfjs-dist/legacy/build/pdf.mjs").then((mod) => {
-      const pdfjs = mod as PdfJsModule;
-      const buildDir = path.dirname(
-        require_.resolve("pdfjs-dist/legacy/build/pdf.mjs"),
-      );
-      if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-        pdfjs.GlobalWorkerOptions.workerSrc = path.join(buildDir, "pdf.worker.mjs");
-      }
+    pdfjsPromise = Promise.all([
+      import("pdfjs-dist/legacy/build/pdf.mjs"),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      import("pdfjs-dist/legacy/build/pdf.worker.mjs" as any),
+    ]).then(([pdfMod, workerMod]) => {
+      const pdfjs = pdfMod as PdfJsModule;
+      // Register the in-process worker handler — no workerSrc needed.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (globalThis as any).pdfjsWorker = workerMod;
       // Standard-14 font metrics for PDFs that reference Helvetica etc.
       // Served over HTTP from public/ — Node's fetch rejects file:// URLs.
       const origin =
         process.env.APP_ORIGIN ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`;
+      pdfjs.GlobalWorkerOptions.workerSrc = ""; // forces the fake-worker path
       pdfjs.GlobalWorkerOptions.standardFontDataUrl = `${origin}/pdf-standard-fonts/`;
       return pdfjs;
     });
@@ -69,6 +76,13 @@ export interface WatermarkIdentity {
   orderRef: string;
 }
 
+/** Marks for public previews — clearly not a licensed copy. */
+export const PREVIEW_IDENTITY: WatermarkIdentity = {
+  name: "PREVIEW",
+  accountId: "SAMPLE",
+  orderRef: "Buy the bundle to unlock all pages",
+};
+
 export interface RenderedPage {
   png: Buffer;
 }
@@ -80,11 +94,44 @@ export interface PageProbeResult {
 
 const RENDER_SCALE = 2; // ~144 dpi — crisp on phones and laptops
 
+/**
+ * Page-1 preview render: low resolution (half the licensed render's
+ * linear size) with the PREVIEW marks instead of any buyer identity.
+ * Nothing here is secret — the output is identical for every visitor.
+ */
+export async function renderPreviewPageCached(
+  storageKey: string,
+): Promise<{ png: Buffer } | { error: string; status: number }> {
+  const cached = previewCache.get(storageKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { png: cached.png };
+  }
+
+  const { getObjectBuffer } = await import("@/lib/storage");
+  const data = await getObjectBuffer(storageKey);
+  const rendered = await renderPageToPng(data, 1, PREVIEW_IDENTITY, {
+    scale: PREVIEW_SCALE,
+  });
+
+  previewCache.set(storageKey, {
+    png: rendered.png,
+    expiresAt: Date.now() + PREVIEW_CACHE_TTL_MS,
+  });
+  return { png: rendered.png };
+}
+
+const PREVIEW_SCALE = 1; // ~72 dpi: readable but not crisp enough to sell
+const previewCache = new Map<string, { png: Buffer; expiresAt: number }>();
+const PREVIEW_CACHE_TTL_MS = 60 * 60 * 1000;
+const PREVIEW_CACHE_MAX = 200;
+
 export async function renderPageToPng(
   data: Uint8Array,
   pageNumber: number,
   identity: WatermarkIdentity,
+  opts?: { scale?: number },
 ): Promise<RenderedPage> {
+  const renderScale = Math.max(1, Math.min(opts?.scale ?? RENDER_SCALE, 4));
   const doc = await loadDocument(data);
   try {
     if (pageNumber < 1 || pageNumber > doc.numPages) {
@@ -95,15 +142,15 @@ export async function renderPageToPng(
 
     // 1) Rasterize the page onto a server-side canvas.
     const canvas = createCanvas(
-      Math.floor(viewport.width * RENDER_SCALE),
-      Math.floor(viewport.height * RENDER_SCALE),
+      Math.floor(viewport.width * renderScale),
+      Math.floor(viewport.height * renderScale),
     );
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({
       canvasContext: ctx,
-      viewport: page.getViewport({ scale: RENDER_SCALE }),
+      viewport: page.getViewport({ scale: renderScale }),
     }).promise;
     page.cleanup();
 

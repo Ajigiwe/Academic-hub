@@ -14,10 +14,7 @@ type CardBundle = Pick<
 export function BundleCard({ bundle }: { bundle: CardBundle }) {
   const paperCount = bundle._count?.resources ?? 0;
   return (
-    <Link
-      href={`/bundles/${bundle.slug}`}
-      className="card-padded group relative flex flex-col gap-2.5 overflow-hidden transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-lift"
-    >
+    <div className="card-padded group relative flex flex-col gap-2.5 overflow-hidden transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-lift">
       {/* Accent strip */}
       <span
         aria-hidden
@@ -32,9 +29,12 @@ export function BundleCard({ bundle }: { bundle: CardBundle }) {
         <span className="badge-neutral">{bundle.academicYear}</span>
       </div>
 
-      <h3 className="line-clamp-2 font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand-800">
+      <Link
+        href={`/bundles/${bundle.slug}`}
+        className="line-clamp-2 font-semibold leading-snug text-neutral-900 transition-colors hover:text-brand-800"
+      >
         {bundle.title}
-      </h3>
+      </Link>
 
       <p className="line-clamp-1 text-sm text-neutral-600">
         {bundle.programme?.name ?? ""}
@@ -50,26 +50,41 @@ export function BundleCard({ bundle }: { bundle: CardBundle }) {
           <p className="text-[11px] font-medium text-neutral-500">
             {paperCount === 0
               ? "Papers coming soon"
-              : `${paperCount} paper${paperCount === 1 ? "" : "s"} included`}
+              : `${paperCount} paper${paperCount === 1 ? "" : "s"} · one price`}
           </p>
         </div>
-        <span className="flex items-center gap-1 text-xs font-medium text-brand-700">
-          Buy bundle
-          <svg
-            className="h-4 w-4 text-neutral-300 transition-all group-hover:translate-x-0.5 group-hover:text-brand-600"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <path d="M5 12h14" />
-            <path d="m12 5 7 7-7 7" />
-          </svg>
-        </span>
       </div>
-    </Link>
+
+      {paperCount > 0 && (
+        <div className="mt-1 flex gap-2">
+          <Link
+            href={`/bundles/${bundle.slug}`}
+            className="btn-primary flex-1 px-3 py-2 text-xs"
+          >
+            Buy bundle
+          </Link>
+          {/* Preview of the first paper's first page — public, no login. */}
+          <Link
+            href={`/bundles/${bundle.slug}#preview`}
+            className="btn-secondary flex-1 px-3 py-2 text-xs"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            Preview
+          </Link>
+        </div>
+      )}
+    </div>
   );
 }

@@ -43,6 +43,10 @@ export default async function BundleDetailPage({
   const papers = bundle.resources;
   const semesters = [...new Set(papers.map((p) => p.semester))].sort();
 
+  // Featured preview: the first published paper that actually has a file
+  // behind it (seeded placeholders have none and would 404).
+  const previewPaper = papers.find((p) => (p.pageCount ?? 0) > 0) ?? null;
+
   // A student owns the bundle when they are entitled to every published
   // paper inside it.
   let owned = false;
@@ -107,6 +111,43 @@ export default async function BundleDetailPage({
               <p className="mt-4 whitespace-pre-line leading-relaxed text-neutral-700">
                 {bundle.description}
               </p>
+            )}
+
+            {/* First-page preview of the featured paper */}
+            {previewPaper && !owned && (
+              <section id="preview" className="card mt-8 scroll-mt-24 overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 bg-neutral-50/60 px-5 py-3">
+                  <div className="min-w-0 flex-1 basis-40">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">
+                      Sneak peek — page 1 of {previewPaper.pageCount}
+                    </p>
+                    <p className="mt-0.5 truncate text-sm font-semibold text-neutral-900">
+                      {previewPaper.title}
+                    </p>
+                  </div>
+                  <span className="badge-gold font-semibold">Free preview</span>
+                </div>
+                <div className="bg-neutral-100 p-4 sm:p-6">
+                  <div className="relative mx-auto max-w-sm overflow-hidden rounded-lg bg-white shadow-card ring-1 ring-neutral-200">
+                    {/* The public preview endpoint renders page 1 at reduced
+                        resolution with a burned-in PREVIEW mark. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/api/preview/${previewPaper.slug}`}
+                      alt={`Preview of the first page of ${previewPaper.title}`}
+                      loading="lazy"
+                      className="block w-full"
+                    />
+                    {/* Fade-out implies the rest is behind the paywall. */}
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent" />
+                  </div>
+                  <p className="mt-4 text-center text-xs text-neutral-500">
+                    Sample page is watermarked and reduced quality — the real
+                    papers are crisp, unwatermarked by anyone else, and unlock
+                    instantly after payment.
+                  </p>
+                </div>
+              </section>
             )}
 
             {/* Papers inside the bundle */}
