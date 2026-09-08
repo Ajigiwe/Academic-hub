@@ -16,7 +16,10 @@ export default async function CheckoutPage({
   const { bundle: bundleId } = await searchParams;
 
   const user = await getCurrentUser();
-  if (!user) redirect(`/login?next=/checkout?bundle=${bundleId ?? ""}`);
+  if (!user)
+    redirect(
+      `/login?next=${encodeURIComponent(`/checkout?bundle=${bundleId ?? ""}`)}`,
+    );
 
   if (!bundleId) redirect("/search");
 

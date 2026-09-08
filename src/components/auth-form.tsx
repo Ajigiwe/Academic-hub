@@ -5,12 +5,22 @@ import { useState } from "react";
 import Link from "next/link";
 import { Logo } from "./logo";
 
-export function AuthForm({ mode }: { mode: "login" | "register" }) {
+export function AuthForm({
+  mode,
+  next,
+}: {
+  mode: "login" | "register";
+  /** Validated in-page path (starts with "/") to return to after auth. */
+  next?: string;
+}) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isRegister = mode === "register";
+  // Carry the destination through the login↔register switch so a student
+  // mid-checkout never loses their place.
+  const switchHref = next ? `/${isRegister ? "login" : "register"}?next=${encodeURIComponent(next)}` : `/${isRegister ? "login" : "register"}`;
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -32,7 +42,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         setError(data.error ?? "Something went wrong. Please try again.");
         return;
       }
-      router.push(data.role === "ADMIN" ? "/admin" : "/library");
+      // Admins always land in the console; everyone else returns to
+      // wherever they were headed (e.g. an interrupted checkout).
+      router.push(
+        data.role === "ADMIN" ? "/admin" : next && next.startsWith("/") ? next : "/library",
+      );
       router.refresh();
     } catch {
       setError("Network error. Please check your connection and try again.");
@@ -113,9 +127,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
       <p className="mt-4 text-center text-sm text-neutral-600">
         {isRegister ? (
-          <>Already have an account? <Link className="font-medium text-brand-700 hover:underline" href="/login">Log in</Link></>
+          <>Already have an account? <Link className="font-medium text-brand-700 hover:underline" href={switchHref}>Log in</Link></>
         ) : (
-          <>New here? <Link className="font-medium text-brand-700 hover:underline" href="/register">Create an account</Link></>
+          <>New here? <Link className="font-medium text-brand-700 hover:underline" href={switchHref}>Create an account</Link></>
         )}
       </p>
     </div>

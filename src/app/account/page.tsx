@@ -7,13 +7,19 @@ import { formatPrice } from "@/lib/resources";
 
 export const metadata: Metadata = { title: "My Account" };
 
-const statusBadge: Record<string, string> = {
-  PAID: "badge-success",
-  PENDING: "badge-gold",
-  FAILED: "badge-danger",
-  CANCELLED: "badge-neutral",
-  REFUNDED: "badge-neutral",
+/** Human labels + badge styles for the raw OrderStatus enum. */
+const statusStyle: Record<string, { label: string; badge: string }> = {
+  PAID: { label: "Paid", badge: "badge-success" },
+  PENDING: { label: "Pending payment", badge: "badge-gold" },
+  FAILED: { label: "Failed", badge: "badge-danger" },
+  CANCELLED: { label: "Cancelled", badge: "badge-neutral" },
+  REFUNDED: { label: "Refunded", badge: "badge-neutral" },
 };
+
+function StatusBadge({ status }: { status: string }) {
+  const s = statusStyle[status] ?? { label: status, badge: "badge-neutral" };
+  return <span className={`${s.badge} font-semibold`}>{s.label}</span>;
+}
 
 export default async function AccountPage() {
   const user = await getCurrentUser();
@@ -27,13 +33,17 @@ export default async function AccountPage() {
   const orders = await prisma.order.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
-    take: 20,
+    take: 50,
     include: {
       items: { include: { bundle: { select: { title: true, slug: true } } } },
     },
   });
 
-  const paidCount = orders.filter((o) => o.status === "PAID").length;
+  // Aggregates computed over the loaded rows (up to 50 — ample for a
+  // student account; the header stat would otherwise undercount).
+  const paidOrders = orders.filter((o) => o.status === "PAID");
+  const paidCount = paidOrders.length;
+  const totalSpent = paidOrders.reduce((sum, o) => sum + o.amountPesewas, 0);
   const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase();
 
   return (
@@ -66,25 +76,30 @@ export default async function AccountPage() {
             <span className="rounded-full bg-neutral-100 px-3 py-1 font-medium text-neutral-700">
               {paidCount} completed purchase{paidCount === 1 ? "" : "s"}
             </span>
+            {totalSpent > 0 && (
+              <span className="rounded-full bg-neutral-100 px-3 py-1 font-medium text-neutral-700">
+                {formatPrice(totalSpent)} spent
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Purchase history */}
+      {/* Order history */}
       <div className="mt-8 flex items-end justify-between">
         <div>
           <h2 className="text-lg font-bold tracking-tight text-neutral-900">
-            Purchase history
+            Order history
           </h2>
           <p className="mt-0.5 text-sm text-neutral-500">
-            Orders and payment status
+            Past purchases, payment status, and receipts
           </p>
         </div>
       </div>
 
       {orders.length === 0 ? (
         <div className="card mt-4 py-12 text-center">
-          <p className="text-sm text-neutral-600">No purchases yet.</p>
+          <p className="text-sm text-neutral-600">No orders yet.</p>
           <Link href="/search" className="btn-primary mt-5">
             Browse Past Questions
           </Link>
@@ -99,35 +114,73 @@ export default async function AccountPage() {
                 <th>Amount</th>
                 <th>Status</th>
                 <th>Date</th>
+                <th>
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {orders.map((o) => (
-                <tr key={o.id} className="transition-colors hover:bg-neutral-50/70">
-                  <td data-label="Order" className="font-mono text-xs">{o.reference}</td>
+                <tr
+                  key={o.id}
+                  className="transition-colors hover:bg-neutral-50/70"
+                >
+                  <td data-label="Order" className="font-mono text-xs">
+                    {o.reference}
+                  </td>
                   <td data-label="Items">
-                    <div className="max-w-56 truncate">
+                    <div className="space-y-0.5">
                       {o.items.map((i) => (
-                        <Link
-                          key={i.id}
-                          href={`/bundles/${i.bundle.slug}`}
-                          className="transition-colors hover:text-brand-700 hover:underline"
-                        >
-                          {i.bundle.title}
-                        </Link>
-                      )).reduce((acc, jsx, idx) => (idx === 0 ? [jsx] : [...acc, ", ", jsx]), [] as React.ReactNode[])}
+                        <div key={i.id} className="min-w-0">
+                          <Link
+                            href={`/bundles/${i.bundle.slug}`}
+                            className="text-sm transition-colors hover:text-brand-700 hover:underline"
+                          >
+                            {i.bundle.title}
+                          </Link>
+                        </div>
+                      ))}
                     </div>
                   </td>
                   <td data-label="Amount" className="whitespace-nowrap font-medium">
                     {formatPrice(o.amountPesewas)}
                   </td>
                   <td data-label="Status">
-                    <span className={statusBadge[o.status] ?? "badge-neutral"}>
-                      {o.status}
-                    </span>
+                    <StatusBadge status={o.status} />
                   </td>
-                  <td data-label="Date" className="whitespace-nowrap text-neutral-600">
-                    {o.createdAt.toLocaleDateString("en-GB")}
+                  <td
+                    data-label="Date"
+                    className="whitespace-nowrap text-neutral-600"
+                    title={
+                      o.paidAt
+                        ? `Paid ${o.paidAt.toLocaleString("en-GB")}`
+                        : undefined
+                    }
+                  >
+                    {o.paidAt
+                      ? o.paidAt.toLocaleDateString("en-GB")
+                      : o.createdAt.toLocaleDateString("en-GB")}
+                  </td>
+                  <td data-label="">
+                    {/* Unpaid orders: a fresh checkout for the same bundle
+                        re-runs payment (the stale pending order just stays
+                        pending); verify route handles PAID idempotently. */}
+                    {o.status === "PENDING" && o.items[0] && (
+                      <Link
+                        href={`/checkout?bundle=${o.items[0].bundleId}`}
+                        className="text-xs font-semibold text-brand-700 hover:underline"
+                      >
+                        Complete payment →
+                      </Link>
+                    )}
+                    {o.status === "FAILED" && o.items[0] && (
+                      <Link
+                        href={`/bundles/${o.items[0].bundle.slug}`}
+                        className="text-xs font-semibold text-brand-700 hover:underline"
+                      >
+                        Try again →
+                      </Link>
+                    )}
                   </td>
                 </tr>
               ))}

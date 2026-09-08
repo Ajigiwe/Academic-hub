@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { formatPrice, getPublishedBundleBySlug } from "@/lib/resources";
+import { MobileBuyBar } from "@/components/mobile-buy-bar";
 
 interface Params {
   slug: string;
@@ -57,9 +58,17 @@ export default async function BundleDetailPage({
   }
 
   const price = formatPrice(bundle.pricePesewas);
+  const purchasable = !owned && papers.length > 0;
 
   return (
     <div className="border-b border-neutral-200 bg-gradient-to-b from-brand-50/60 to-neutral-50">
+      {purchasable && (
+        <MobileBuyBar
+          href={`/checkout?bundle=${bundle.id}`}
+          price={price}
+          papersLabel={`${papers.length} paper${papers.length === 1 ? "" : "s"} · one price`}
+        />
+      )}
       <div className="container-page max-w-5xl py-8">
         <nav className="text-sm text-neutral-500" aria-label="Breadcrumb">
           <Link href="/search" className="transition-colors hover:text-brand-700">
@@ -144,7 +153,7 @@ export default async function BundleDetailPage({
           </div>
 
           {/* Buy box */}
-          <aside className="lg:sticky lg:top-24 lg:self-start">
+          <aside className={`lg:sticky lg:top-24 lg:self-start ${purchasable ? "pb-16 md:pb-0" : ""}`}>
             <div className="card overflow-hidden">
               <div className="h-1 w-full bg-gradient-to-r from-brand-600 to-gold-400" />
               <div className="p-5">

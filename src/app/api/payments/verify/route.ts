@@ -21,22 +21,40 @@ export async function GET(req: Request) {
 
   const user = await getCurrentUser();
   if (!user) {
-    return NextResponse.redirect(`${appUrl}/login?next=/payment/result?ref=${reference}`);
+    const returnTo = `/payment/result?status=success&ref=${encodeURIComponent(reference)}`;
+    return NextResponse.redirect(
+      `${appUrl}/login?next=${encodeURIComponent(returnTo)}`,
+    );
   }
 
   const order = await prisma.order.findUnique({
     where: { reference },
-    select: { id: true, userId: true, status: true },
+    select: {
+      id: true,
+      userId: true,
+      status: true,
+      items: { select: { bundle: { select: { slug: true } } } },
+    },
   });
   if (!order || order.userId !== user.id) return fail("Order not found.");
 
+  // Single-bundle orders deep-link the success screen to the bundle page
+  // ("Start reading now"); multi-bundle orders just go to the library.
+  const bundleSlug =
+    order.items.length === 1 ? order.items[0].bundle.slug : null;
+  const successUrl = (withBundle: boolean) => {
+    const params = new URLSearchParams({ status: "success", ref: reference });
+    if (withBundle && bundleSlug) params.set("bundle", `/bundles/${bundleSlug}`);
+    return `${appUrl}/payment/result?${params.toString()}`;
+  };
+
   if (order.status === "PAID") {
-    return NextResponse.redirect(`${appUrl}/payment/result?status=success&ref=${reference}`);
+    return NextResponse.redirect(successUrl(true));
   }
 
   try {
     await processSuccessfulPayment(reference);
-    return NextResponse.redirect(`${appUrl}/payment/result?status=success&ref=${reference}`);
+    return NextResponse.redirect(successUrl(true));
   } catch (err) {
     console.error("Verify callback failed", err);
     return fail("We could not confirm your payment.");

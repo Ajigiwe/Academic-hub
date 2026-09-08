@@ -5,13 +5,17 @@ import { getCurrentUser } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Create account" };
 
-export default async function RegisterPage() {
-  const user = await getCurrentUser();
-  if (user) redirect("/library");
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const [{ next }, user] = await Promise.all([searchParams, getCurrentUser()]);
+  if (user) redirect(next && next.startsWith("/") ? next : "/library");
 
   return (
     <div className="container-page flex justify-center py-12">
-      <AuthForm mode="register" />
+      <AuthForm mode="register" next={next} />
     </div>
   );
 }

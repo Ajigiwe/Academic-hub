@@ -76,11 +76,19 @@ function Shell({
 export default async function PaymentResultPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; ref?: string; reason?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    ref?: string;
+    reason?: string;
+    bundle?: string;
+  }>;
 }) {
-  const { status, ref, reason } = await searchParams;
+  const { status, ref, reason, bundle } = await searchParams;
 
   if (status === "success") {
+    // Deep-link straight into what was just bought (the verify callback
+    // appends &bundle=<slug> when the order maps to a single bundle).
+    const firstPaperHref = bundle?.startsWith("/") ? bundle : null;
     return (
       <Shell
         status="success"
@@ -88,7 +96,15 @@ export default async function PaymentResultPage({
         reference={ref}
         actions={
           <>
-            <Link href="/library" className="btn-primary">
+            {firstPaperHref && (
+              <Link href={firstPaperHref} className="btn-primary">
+                Start reading now
+              </Link>
+            )}
+            <Link
+              href="/library"
+              className={firstPaperHref ? "btn-secondary" : "btn-primary"}
+            >
               Go to My Library
             </Link>
             <Link href="/search" className="btn-secondary">
