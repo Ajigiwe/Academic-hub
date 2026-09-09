@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { formatPrice, getPublishedBundleBySlug } from "@/lib/resources";
+import { isProgrammeEnabled } from "@/lib/settings";
 import { MobileBuyBar } from "@/components/mobile-buy-bar";
 
 interface Params {
@@ -17,7 +18,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const bundle = await getPublishedBundleBySlug(slug);
-  if (!bundle || bundle.status !== "PUBLISHED") {
+  if (
+    !bundle ||
+    bundle.status !== "PUBLISHED" ||
+    !(await isProgrammeEnabled(bundle.programme.slug))
+  ) {
     return { title: "Bundle not found" };
   }
   return {
@@ -60,6 +65,10 @@ export default async function BundleDetailPage({
     });
     owned = ownedCount === papers.length;
   }
+
+  // Hidden programme: nobody reaches the page by guessing the URL — except
+  // students who already own it (their purchase is never revoked).
+  if (!(await isProgrammeEnabled(bundle.programme.slug)) && !owned) notFound();
 
   const price = formatPrice(bundle.pricePesewas);
   const purchasable = !owned && papers.length > 0;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getObjectStream } from "@/lib/storage";
 import { slugify } from "@/lib/resource-admin";
+import { isProgrammeEnabled } from "@/lib/settings";
 
 interface Params {
   params: Promise<{ slug: string }>;
@@ -20,6 +21,7 @@ export async function GET(_req: Request, { params }: Params) {
     where: { slug, bundleId: null, status: "PUBLISHED" },
     include: {
       course: { select: { code: true, title: true } },
+      programme: { select: { slug: true } },
       files: {
         where: { isCurrent: true },
         orderBy: { createdAt: "desc" },
@@ -29,6 +31,9 @@ export async function GET(_req: Request, { params }: Params) {
   });
 
   if (!resource || !resource.files[0]) {
+    return NextResponse.json({ error: "Material not found." }, { status: 404 });
+  }
+  if (!(await isProgrammeEnabled(resource.programme.slug))) {
     return NextResponse.json({ error: "Material not found." }, { status: 404 });
   }
 

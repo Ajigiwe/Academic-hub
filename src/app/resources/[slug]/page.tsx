@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { hasEntitlement } from "@/lib/entitlements";
 import { formatBytes, formatPrice, getPublishedResourceBySlug } from "@/lib/resources";
+import { isProgrammeEnabled } from "@/lib/settings";
 
 interface Params {
   slug: string;
@@ -16,7 +17,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const resource = await getPublishedResourceBySlug(slug);
-  if (!resource || resource.status !== "PUBLISHED") {
+  if (
+    !resource ||
+    resource.status !== "PUBLISHED" ||
+    !(await isProgrammeEnabled(resource.programme.slug))
+  ) {
     return { title: "Resource not found" };
   }
   return {
@@ -48,6 +53,9 @@ export default async function ResourceDetailPage({
 
   const owned = user ? await hasEntitlement(user, resource.id) : false;
   if (resource.status === "UNPUBLISHED" && !owned) notFound();
+  // Hidden programme: direct links 404 for everyone except owners (a
+  // purchase is never revoked — the library and viewer keep working).
+  if (!(await isProgrammeEnabled(resource.programme.slug)) && !owned) notFound();
 
   const bundle = resource.bundle;
   const price = bundle ? formatPrice(bundle.pricePesewas) : null;

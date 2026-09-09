@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { renderPreviewPageCached } from "@/lib/pdf-render";
+import { isProgrammeEnabled } from "@/lib/settings";
 
 interface Params {
   params: Promise<{ slug: string }>;
@@ -29,6 +30,7 @@ export async function GET(
       bundleId: { not: null }, // previews are for sellable papers only
     },
     select: {
+      programme: { select: { slug: true } },
       files: {
         where: { isCurrent: true },
         orderBy: { createdAt: "desc" },
@@ -37,6 +39,13 @@ export async function GET(
       },
     },
   });
+
+  if (resource && !(await isProgrammeEnabled(resource.programme.slug))) {
+    return NextResponse.json(
+      { error: "Preview not available." },
+      { status: 404 },
+    );
+  }
 
   const storageKey = resource?.files[0]?.storageKey;
   if (!storageKey) {

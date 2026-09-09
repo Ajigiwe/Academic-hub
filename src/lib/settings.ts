@@ -37,3 +37,14 @@ export async function getEnabledProgrammes(): Promise<Array<(typeof PROGRAMMES)[
   const enabled = new Set(await getEnabledProgrammeSlugs());
   return PROGRAMMES.filter((p) => enabled.has(p.slug));
 }
+
+/**
+ * True when a programme row's slug is visible to students. Canonical
+ * slugs (BTECH, Dip Tech, HND) follow the Admin → Settings toggle; any
+ * other slug is not managed by the settings system and stays visible
+ * (it was created directly by an admin upload form).
+ */
+export async function isProgrammeEnabled(slug: string): Promise<boolean> {
+  const flags = await getProgrammeSettings();
+  return flags.get(slug as ProgrammeSlug) ?? true;
+}

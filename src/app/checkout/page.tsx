@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { formatPrice } from "@/lib/resources";
+import { isProgrammeEnabled } from "@/lib/settings";
 import { CheckoutButton } from "@/components/checkout-button";
 
 export const metadata: Metadata = { title: "Checkout" };
@@ -36,6 +37,9 @@ export default async function CheckoutPage({
     },
   });
   if (!bundle) redirect("/search");
+
+  // Disabled programme → not purchasable right now (Admin → Settings).
+  if (!(await isProgrammeEnabled(bundle.programme.slug))) redirect("/search");
 
   const ownedCount = await prisma.entitlement.count({
     where: {
