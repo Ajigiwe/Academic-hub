@@ -135,14 +135,23 @@ const mockProvider: PaymentProvider = {
 // ─────────────────────────────────────────────────────────────────
 
 export function getPaymentProvider(): PaymentProvider {
-  switch (process.env.PAYMENT_PROVIDER) {
+  const configured = process.env.PAYMENT_PROVIDER;
+  switch (configured) {
+    case undefined:
+    case "":
+    case "mock":
+      return mockProvider;
     case "moolre":
       // Lazy import keeps Moolre env requirements out of the mock path.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       return (require("@/lib/moolre") as { moolreProvider: PaymentProvider }).moolreProvider;
     // case "paystack": return paystackProvider; // added when credentials exist
     default:
-      return mockProvider;
+      // Unset → sandbox by design; but an *explicitly wrong* name is a
+      // misconfiguration and must fail loudly, not simulate real money.
+      throw new Error(
+        `Unknown PAYMENT_PROVIDER "${configured}". Expected "mock" or "moolre".`,
+      );
   }
 }
 
