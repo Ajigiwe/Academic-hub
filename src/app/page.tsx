@@ -1,9 +1,6 @@
 import Link from "next/link";
-import { BrowsePicker } from "@/components/browse-picker";
-import { getEnabledProgrammeSlugs } from "@/lib/settings";
 
-export default async function HomePage() {
-  const enabledSlugs = await getEnabledProgrammeSlugs();
+export default function HomePage() {
   return (
     <div>
       {/* Hero + intent entry (client flow: choose what you came for) */}
@@ -33,8 +30,8 @@ export default async function HomePage() {
 
             {/* Two doors: the visitor picks their intent immediately */}
             <div className="mx-auto mt-8 grid max-w-2xl gap-4 sm:grid-cols-2 sm:gap-5">
-              <a
-                href="#browse"
+              <Link
+                href="/courses"
                 className="group relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-brand-500 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:p-7"
               >
                 {/* Soft glow that fades in behind the icon on hover */}
@@ -63,7 +60,7 @@ export default async function HomePage() {
                     Browse papers →
                   </span>
                 </span>
-              </a>
+              </Link>
               <Link
                 href="/materials"
                 className="group relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-amber-400 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 sm:p-7"
@@ -95,24 +92,6 @@ export default async function HomePage() {
                 </span>
               </Link>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Guided picker — intent → year → semester → programme. The main
-          event of the homepage: no bundles are shown until the visitor
-          declares what they want. */}
-      <section id="browse" className="container-page scroll-mt-20 py-12">
-        <div className="mx-auto max-w-3xl">
-          <h2 className="text-center text-xl font-bold tracking-tight text-neutral-900">
-            What are you here for?
-          </h2>
-          <p className="mx-auto mt-1 max-w-md text-center text-sm text-neutral-500">
-            Choose past questions or course materials, then your year,
-            semester, and programme.
-          </p>
-          <div className="mt-6">
-            <BrowsePicker enabledSlugs={enabledSlugs} />
           </div>
         </div>
       </section>
