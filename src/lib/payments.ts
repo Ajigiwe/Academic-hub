@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { createHmac, timingSafeEqual } from "crypto";
+import { paystackProvider } from "@/lib/paystack";
 
 /**
  * Payment abstraction (spec §11): the checkout flow depends on this
@@ -141,6 +142,8 @@ export function getPaymentProvider(): PaymentProvider {
     case "":
     case "mock":
       return mockProvider;
+    case "paystack":
+      return paystackProvider;
     case "moolre":
       // Lazy import keeps Moolre env requirements out of the mock path.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -150,7 +153,7 @@ export function getPaymentProvider(): PaymentProvider {
       // Unset → sandbox by design; but an *explicitly wrong* name is a
       // misconfiguration and must fail loudly, not simulate real money.
       throw new Error(
-        `Unknown PAYMENT_PROVIDER "${configured}". Expected "mock" or "moolre".`,
+        `Unknown PAYMENT_PROVIDER "${configured}". Expected "mock", "paystack", or "moolre".`,
       );
   }
 }

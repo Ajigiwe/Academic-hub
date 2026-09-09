@@ -144,7 +144,7 @@ export default async function CheckoutPage({
                 Mobile Money / Card
               </p>
               <p className="text-xs text-neutral-500">
-                Secured gateway · GH₵ · sandbox during pilot
+                Secured checkout via Paystack · GH₵
               </p>
             </div>
           </div>

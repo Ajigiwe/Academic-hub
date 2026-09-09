@@ -13,8 +13,9 @@ abstraction, entitlements, a secure viewer shell, admin, and the PWA base.
 - **Next.js 16** (App Router, TypeScript, Tailwind v4) — frontend + API
 - **PostgreSQL 16** via **Prisma 6**
 - **Private S3-compatible storage** (MinIO in dev; S3/R2 in production)
-- **Payment abstraction layer** with a built-in sandbox gateway (real
-  providers like Paystack plug into the same interface)
+- **Paystack payment integration** for Ghana card and mobile-money checkout
+- **Payment abstraction layer** with a built-in sandbox gateway for local development
+- **Server-side payment verification and idempotent webhook fulfillment**
 
 ## Demo deployment (Vercel + Neon + R2)
 
@@ -37,7 +38,10 @@ is structured for exactly this — set the env vars below and deploy.
    | `S3_BUCKET` | `pastq-private` — **create this bucket first** in the R2 dashboard |
    | `APP_ORIGIN` | `https://<your-app>.vercel.app` (no trailing slash) |
    | `PAGE_TOKEN_SECRET` | a long random string (`openssl rand -hex 32`) |
-   | `PAYMENT_PROVIDER` | leave unset / `mock` — sandbox checkout, no keys |
+   | `PAYMENT_PROVIDER` | `paystack` for live checkout; use `mock` only for local sandbox testing |
+   | `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | matching Paystack public key from Lite-LMS |
+   | `PAYSTACK_SECRET_KEY` | matching Paystack secret key from Lite-LMS |
+   | `PAYMENT_WEBHOOK_SECRET` | legacy mock-gateway signing secret; not needed for Paystack |
 
 3. Deploy. Then run the one-time data setup **once**, with a `.env` file
    pointing `DATABASE_URL` at the Neon database (never commit it):
@@ -60,8 +64,9 @@ is structured for exactly this — set the env vars below and deploy.
    | Student | `student@pastq.test` | `Student@123` |
 
    Student demo path: **My Library** → open a paper → the secure viewer.
-   Checkout uses the sandbox gateway — approve on the mock page and the
-   order is fulfilled (server-side verification, entitlement grant).
+   For live checkout, configure Paystack and set the webhook URL to
+   `/api/payments/webhook`. For local development, use `PAYMENT_PROVIDER=mock`
+   and approve on the mock page.
 
 Notes: the upload/viewer pipeline uses native packages (`pdfjs-dist`,
 `@napi-rs/canvas`, `pdf-lib`) that run on Vercel's Node functions; the
@@ -100,12 +105,16 @@ Stop everything with `npm run services:down`; check state with
 | Admin   | `admin@pastq.test`   | `Admin@12345` |
 | Student | `student@pastq.test` | `Student@123` |
 
-### Buying something (sandbox)
+### Buying something
 
-Log in as the student → open any bundle → **Buy Now** → the sandbox
-"Mobile Money" page lets you approve, fail, or cancel. Approving fires a signed
-webhook → server-side verification → entitlement grant → the resource appears
-in **My Library** → open the secure viewer.
+Log in as the student → open any bundle → **Buy Now**. With
+`PAYMENT_PROVIDER=paystack`, checkout redirects to Paystack and supports Ghana
+mobile money and card payments. Paystack redirects back to
+`/api/payments/verify`, while `POST /api/payments/webhook` receives signed
+`charge.success` events. Both paths verify the payment server-side before
+fulfilling the order.
+
+For local sandbox work, set `PAYMENT_PROVIDER=mock`; no real money is involved.
 
 ## How the security model is wired
 
@@ -139,8 +148,7 @@ public/sw.js              # PWA service worker (offline shell)
 
 ## Roadmap (from the spec)
 
-1. **Next:** replace the sandbox gateway with a real provider (Paystack),
-   PWA caching sprint + offline reading, favourites, reviews, coupons.
+1. **Next:** PWA caching sprint + offline reading, favourites, reviews, coupons.
 2. Later: multi-seller marketplace (spec §41), native apps (spec §40).
 
 ## Conventions

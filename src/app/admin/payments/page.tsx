@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
  * Payments console — the debugging companion to /admin/orders.
  * Orders answers "who bought what"; this page answers "what did the
  * gateway say": per-payment provider state (including failure reasons)
- * and the raw webhook deliveries from Moolre, with the untouched JSON
+ * and the raw Paystack webhook deliveries, with the untouched JSON
  * payload for inspecting unexpected callbacks.
  */
 
