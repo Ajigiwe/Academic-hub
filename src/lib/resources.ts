@@ -23,7 +23,11 @@ export const SEARCH_PER_PAGE = 12;
 
 const PUBLISHED_RESOURCE: Prisma.ResourceWhereInput = { status: "PUBLISHED" };
 
-export async function searchBundles(filters: SearchFilters) {
+export async function searchBundles(
+  filters: SearchFilters,
+  /** Programme slugs the visitor may see — disabled tracks are hidden. */
+  enabledProgrammes?: string[],
+) {
   const page = Math.max(1, filters.page ?? 1);
   const perPage = filters.perPage ?? SEARCH_PER_PAGE;
 
@@ -40,7 +44,11 @@ export async function searchBundles(filters: SearchFilters) {
       { academicYear: { contains: q } },
     ];
   }
-  if (filters.programme) where.programme = { is: { slug: filters.programme } };
+  if (filters.programme) {
+    where.programme = { is: { slug: filters.programme } };
+  } else if (enabledProgrammes) {
+    where.programme = { is: { slug: { in: enabledProgrammes } } };
+  }
   if (filters.level) where.level = filters.level;
   if (filters.year) where.academicYear = filters.year;
   // A bundle counts as belonging to a semester when at least one of its
@@ -143,9 +151,9 @@ export async function getPublishedResourceBySlug(slug: string) {
   });
 }
 
-export async function getProgrammes() {
+export async function getProgrammes(enabledProgrammes?: string[]) {
   return prisma.programme.findMany({
-    where: { slug: { in: PROGRAMME_SLUGS } },
+    where: { slug: { in: enabledProgrammes ?? PROGRAMME_SLUGS } },
     orderBy: { name: "asc" },
     include: { _count: { select: { bundles: { where: { status: "PUBLISHED" } } } } },
   });
@@ -166,17 +174,25 @@ export async function getFilterYears(): Promise<string[]> {
  * resources that belong to NO sale bundle. Optionally filtered to a
  * programme track + level + semester, matching the guided browse flow.
  */
-export async function getFreeMaterials(filters: {
-  programme?: string;
-  level?: number;
-  semester?: number;
-  q?: string;
-}) {
+export async function getFreeMaterials(
+  filters: {
+    programme?: string;
+    level?: number;
+    semester?: number;
+    q?: string;
+  },
+  /** Programme slugs the visitor may see — disabled tracks are hidden. */
+  enabledProgrammes?: string[],
+) {
   const where: Prisma.ResourceWhereInput = {
     status: "PUBLISHED",
     bundleId: null,
   };
-  if (filters.programme) where.programme = { is: { slug: filters.programme } };
+  if (filters.programme) {
+    where.programme = { is: { slug: filters.programme } };
+  } else if (enabledProgrammes) {
+    where.programme = { is: { slug: { in: enabledProgrammes } } };
+  }
   if (filters.level) where.level = filters.level;
   if (filters.semester) where.semester = filters.semester;
   if (filters.q?.trim()) {

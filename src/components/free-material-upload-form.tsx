@@ -4,7 +4,6 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { uploadFreeMaterialAction, type FreeUploadState } from "@/lib/admin-actions";
-import { PROGRAMMES } from "@/lib/programmes";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -28,8 +27,11 @@ export interface CourseSuggestion {
  */
 export function FreeMaterialUploadForm({
   suggestions,
+  programmes,
 }: {
   suggestions: CourseSuggestion[];
+  /** Programme tracks available for new materials (disabled ones are hidden). */
+  programmes: { slug: string; name: string }[];
 }) {
   const [state, formAction] = useActionState<FreeUploadState, FormData>(
     uploadFreeMaterialAction,
@@ -133,12 +135,12 @@ export function FreeMaterialUploadForm({
             id="free-programme"
             name="programmeName"
             required
-            defaultValue={PROGRAMMES[0].name}
+            defaultValue={programmes[0]?.name ?? ""}
             className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
           >
-            {PROGRAMMES.map((p) => (
+            {programmes.map((p) => (
               <option key={p.slug} value={p.name}>
-                {p.short} — {p.name}
+                {p.name}
               </option>
             ))}
           </select>

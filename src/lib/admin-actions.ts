@@ -15,6 +15,8 @@ import {
   slugify,
 } from "@/lib/resource-admin";
 import { grantBundlePapersToPastBuyers } from "@/lib/entitlement-grant";
+import { PROGRAMME_SLUGS } from "@/lib/programmes";
+import { programmeSettingKey } from "@/lib/settings";
 
 /**
  * Guard for every admin action. Server actions are ordinary HTTP
@@ -427,4 +429,36 @@ export async function deleteDraftAction(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/admin/resources");
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Platform settings (admin/settings)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Persist programme visibility. A checked box means the programme is
+ * live for students; unchecked hides it from browsing, filters, and
+ * search (content stays in the catalogue). Re-enabling restores it.
+ */
+export async function saveProgrammeSettingsAction(formData: FormData): Promise<void> {
+  const admin = await requireAdminUser();
+  if (!admin) return;
+
+  await prisma.$transaction(
+    PROGRAMME_SLUGS.map((slug) => {
+      const key = programmeSettingKey(slug);
+      const value = formData.get(key) !== null ? "true" : "false";
+      return prisma.setting.upsert({
+        where: { key },
+        update: { value },
+        create: { key, value },
+      });
+    }),
+  );
+
+  revalidatePath("/admin/settings");
+  revalidatePath("/");
+  revalidatePath("/courses");
+  revalidatePath("/materials");
+  revalidatePath("/search");
 }

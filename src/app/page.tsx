@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { PaperStack } from "@/components/paper-stack";
 import { BrowsePicker } from "@/components/browse-picker";
+import { getEnabledProgrammeSlugs } from "@/lib/settings";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const enabledSlugs = await getEnabledProgrammeSlugs();
   return (
     <div>
       {/* Hero + intent entry (client flow: choose what you came for) */}
@@ -17,73 +18,57 @@ export default function HomePage() {
               "radial-gradient(circle at 15% 20%, rgb(37 99 235 / 0.08) 0, transparent 40%), radial-gradient(circle at 85% 10%, rgb(11 45 91 / 0.08) 0, transparent 45%)",
           }}
         />
-        <div className="container-page relative grid items-center gap-10 py-14 sm:py-16 lg:grid-cols-[1.08fr_0.92fr] lg:gap-8 lg:py-20">
-          <div className="text-center lg:text-left">
-          <span className="badge badge-brand mb-5 px-3 py-1 shadow-sm">
-            <svg
-              className="mr-1.5 inline h-3.5 w-3.5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
-            </svg>
-            Instant access after payment
-          </span>
-          <h1 className="mx-auto max-w-2xl text-balance text-4xl font-extrabold tracking-[-0.035em] text-neutral-900 sm:text-6xl lg:mx-0">
-            Find the Past Questions{" "}
-            <span className="bg-gradient-to-r from-brand-700 to-brand-500 bg-clip-text text-transparent">
-              You Need.
-            </span>
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl text-base text-neutral-600 sm:text-lg lg:mx-0">
-            Past questions for your course and year, plus free slides and
-            notes — tell us what you came for and we'll take you there.
-          </p>
+        <div className="container-page relative py-14 sm:py-16 lg:py-20">
+          <div className="text-center">
+            <h1 className="mx-auto max-w-2xl text-balance text-4xl font-extrabold tracking-[-0.035em] text-neutral-900 sm:text-6xl">
+              Find the Past Questions{" "}
+              <span className="bg-gradient-to-r from-brand-700 to-brand-500 bg-clip-text text-transparent">
+                You Need.
+              </span>
+            </h1>
+            <p className="mx-auto mt-4 max-w-xl text-base text-neutral-600 sm:text-lg">
+              Past questions for your course and year, plus free slides and
+              notes — tell us what you came for and we'll take you there.
+            </p>
 
-          {/* Two doors: the visitor picks their intent immediately */}
-          <div className="mx-auto mt-7 grid max-w-xl gap-3 sm:grid-cols-2 lg:mx-0">
-            <a
-              href="#browse"
-              className="group rounded-xl border border-neutral-200 bg-white p-4 text-left shadow-md transition-all hover:border-brand-500 hover:shadow-lift"
-            >
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-700 text-white">
-                <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                  <path d="M14 2v6h6" />
-                </svg>
-              </span>
-              <p className="mt-2.5 text-sm font-bold text-neutral-900">
-                Past questions
-              </p>
-              <p className="mt-0.5 text-xs text-neutral-600">
-                Exam papers by course & year — for sale.
-              </p>
-            </a>
-            <Link
-              href="/materials"
-              className="group rounded-xl border border-neutral-200 bg-white p-4 text-left shadow-md transition-all hover:border-amber-400 hover:shadow-lift"
-            >
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-amber-500 text-white">
-                <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <path d="M7 8h10M7 12h10M7 16h6" />
-                </svg>
-              </span>
-              <p className="mt-2.5 text-sm font-bold text-neutral-900">
-                Course materials
-              </p>
-              <p className="mt-0.5 text-xs text-neutral-600">
-                Slides & notes — free to download.
-              </p>
-            </Link>
+            {/* Two doors: the visitor picks their intent immediately */}
+            <div className="mx-auto mt-8 grid max-w-2xl gap-4 sm:grid-cols-2 sm:gap-5">
+              <a
+                href="#browse"
+                className="group rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-md transition-all hover:border-brand-500 hover:shadow-lift sm:p-7"
+              >
+                <span className="grid h-14 w-14 place-items-center rounded-xl bg-brand-700 text-white transition-colors group-hover:bg-brand-800">
+                  <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                    <path d="M14 2v6h6" />
+                  </svg>
+                </span>
+                <p className="mt-4 text-lg font-bold text-neutral-900">
+                  Past questions
+                </p>
+                <p className="mt-1 text-sm text-neutral-600">
+                  Exam papers by course & year — for sale.
+                </p>
+              </a>
+              <Link
+                href="/materials"
+                className="group rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-md transition-all hover:border-amber-400 hover:shadow-lift sm:p-7"
+              >
+                <span className="grid h-14 w-14 place-items-center rounded-xl bg-amber-500 text-white transition-colors group-hover:bg-amber-600">
+                  <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M7 8h10M7 12h10M7 16h6" />
+                  </svg>
+                </span>
+                <p className="mt-4 text-lg font-bold text-neutral-900">
+                  Course materials
+                </p>
+                <p className="mt-1 text-sm text-neutral-600">
+                  Slides & notes — free to download.
+                </p>
+              </Link>
+            </div>
           </div>
-          </div>
-          <PaperStack />
         </div>
       </section>
 
@@ -100,7 +85,7 @@ export default function HomePage() {
             semester, and programme.
           </p>
           <div className="mt-6">
-            <BrowsePicker />
+            <BrowsePicker enabledSlugs={enabledSlugs} />
           </div>
         </div>
       </section>

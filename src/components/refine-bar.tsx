@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { PROGRAMMES, LEVELS } from "@/lib/programmes";
+import { LEVELS } from "@/lib/programmes";
 
 /**
  * Compact refine bar for the results pages (/courses, /materials): change
@@ -16,12 +16,15 @@ import { PROGRAMMES, LEVELS } from "@/lib/programmes";
  */
 export function RefineBar({
   base,
+  programmes,
   programme,
   level,
   semester,
   resultLabel,
 }: {
   base: "/courses" | "/materials";
+  /** Programme tracks the visitor may pick (disabled ones are hidden). */
+  programmes: { slug: string; short: string }[];
   programme?: string;
   level?: number;
   semester?: number;
@@ -63,7 +66,7 @@ export function RefineBar({
           onChange={(e) => navigate({ programme: e.target.value || undefined, level, semester })}
         >
           <option value="">All programmes</option>
-          {PROGRAMMES.map((p) => (
+          {programmes.map((p) => (
             <option key={p.slug} value={p.slug}>
               {p.short}
             </option>

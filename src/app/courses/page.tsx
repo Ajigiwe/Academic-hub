@@ -4,12 +4,8 @@ import {
   getFreeMaterials,
   type SearchBundleItem,
 } from "@/lib/resources";
-import {
-  PROGRAMMES,
-  programmeBySlug,
-  isProgrammeSlug,
-  isLevel,
-} from "@/lib/programmes";
+import { programmeBySlug, isProgrammeSlug, isLevel } from "@/lib/programmes";
+import { getEnabledProgrammes } from "@/lib/settings";
 import { BundleCard } from "@/components/bundle-card";
 import { FreeMaterialCard } from "@/components/free-material-card";
 import { RefineBar } from "@/components/refine-bar";
@@ -34,7 +30,12 @@ export default async function CoursesPage({
   searchParams: Promise<SearchParams>;
 }) {
   const sp = await searchParams;
-  const programme = isProgrammeSlug(sp.programme) ? sp.programme : undefined;
+  const enabledProgrammes = await getEnabledProgrammes();
+  const enabledSlugs = enabledProgrammes.map((p) => p.slug);
+  const programme =
+    isProgrammeSlug(sp.programme) && enabledSlugs.includes(sp.programme)
+      ? sp.programme
+      : undefined;
   const level = isLevel(Number(sp.level)) ? Number(sp.level) : undefined;
   const semester = sp.semester === "1" || sp.semester === "2" ? Number(sp.semester) : undefined;
 
@@ -44,9 +45,9 @@ export default async function CoursesPage({
 
   const [{ items, total }, freeMaterials] = await Promise.all([
     anyFilter
-      ? searchBundles({ programme, level, semester, perPage: 50 })
+      ? searchBundles({ programme, level, semester, perPage: 50 }, enabledSlugs)
       : Promise.resolve({ items: [], total: 0 }),
-    getFreeMaterials({ programme, level, semester }),
+    getFreeMaterials({ programme, level, semester }, enabledSlugs),
   ]);
 
   const grouped = new Map<string, SearchBundleItem[]>();
@@ -94,6 +95,7 @@ export default async function CoursesPage({
       {/* In-place refinement — works with any combination of filters */}
       <RefineBar
         base="/courses"
+        programmes={enabledProgrammes.map((p) => ({ slug: p.slug, short: p.short }))}
         programme={programme}
         level={level}
         semester={semester}

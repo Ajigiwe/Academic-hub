@@ -416,6 +416,19 @@ enum NotificationType {
   PROMO
 }
 
+// ────────────────────────────────────────────────────────────────
+// Platform settings (key/value) — e.g. which programmes are visible
+// to students. A missing row means "default" (see src/lib/settings.ts).
+// ────────────────────────────────────────────────────────────────
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
 model Notification {
   id        String           @id @default(cuid())
   userId    String           @map("user_id")

@@ -4,7 +4,6 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { uploadBundleFilesAction, type UploadState } from "@/lib/admin-actions";
-import { PROGRAMMES } from "@/lib/programmes";
 
 export interface BundleOption {
   id: string;
@@ -32,9 +31,12 @@ function SubmitButton() {
 export function BundleUploadForm({
   bundles,
   suggestions,
+  programmes,
 }: {
   bundles: BundleOption[];
   suggestions: Suggestion[];
+  /** Programme tracks available for new bundles (disabled ones are hidden). */
+  programmes: { slug: string; name: string }[];
 }) {
   const [state, formAction] = useActionState<UploadState, FormData>(
     uploadBundleFilesAction,
@@ -224,10 +226,10 @@ export function BundleUploadForm({
               id="upload-programme"
               name="programmeName"
               required
-              defaultValue={PROGRAMMES[0].name}
+              defaultValue={programmes[0]?.name ?? ""}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             >
-              {PROGRAMMES.map((p) => (
+              {programmes.map((p) => (
                 <option key={p.slug} value={p.name}>
                   {p.name}
                 </option>

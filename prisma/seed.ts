@@ -152,6 +152,14 @@ const BUNDLES = [
   },
 ];
 
+// Default visibility flags — only BTECH is live for now; the other
+// tracks can be switched on later from Admin → Settings.
+const PROGRAMME_SETTINGS = [
+  { key: "programme.btech.enabled", value: "true" },
+  { key: "programme.dip-tech.enabled", value: "false" },
+  { key: "programme.hnd.enabled", value: "false" },
+];
+
 async function main() {
   console.log("Seeding…");
 
@@ -195,6 +203,14 @@ async function main() {
       where: { code: c.code },
       update: {},
       create: c,
+    });
+  }
+
+  for (const s of PROGRAMME_SETTINGS) {
+    await prisma.setting.upsert({
+      where: { key: s.key },
+      update: {},
+      create: s,
     });
   }
 

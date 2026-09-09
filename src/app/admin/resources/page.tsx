@@ -4,6 +4,7 @@ import { BundleUploadForm } from "@/components/bundle-upload-form";
 import { FreeMaterialUploadForm } from "@/components/free-material-upload-form";
 import { AdminResourceFilters } from "@/components/admin-resource-filters";
 import { setResourceStatusAction, deleteDraftAction } from "@/lib/admin-actions";
+import { getEnabledProgrammes } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ export default async function AdminResourcesPage({
   if (programme) where.programme = { name: programme };
   if (status) where.status = status;
 
-  const [resources, courses, programmes, bundles] = await Promise.all([
+  const [resources, courses, programmes, bundles, enabledProgrammes] = await Promise.all([
     prisma.resource.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -82,6 +83,7 @@ export default async function AdminResourcesPage({
         course: { select: { code: true } },
       },
     }),
+    getEnabledProgrammes(),
   ]);
 
   const suggestions = courses.map((c) => ({
@@ -110,7 +112,11 @@ export default async function AdminResourcesPage({
           Each file is sniffed and probed server-side (magic bytes, page
           count, encryption) before anything is stored.
         </p>
-        <BundleUploadForm bundles={bundles} suggestions={suggestions} />
+        <BundleUploadForm
+          bundles={bundles}
+          suggestions={suggestions}
+          programmes={enabledProgrammes.map((p) => ({ slug: p.slug, name: p.name }))}
+        />
       </section>
 
       {/* ── Free materials upload ─────────────────────────────── */}
@@ -126,6 +132,7 @@ export default async function AdminResourcesPage({
         </p>
         <FreeMaterialUploadForm
           suggestions={courses.map((c) => ({ code: c.code, title: c.title }))}
+          programmes={enabledProgrammes.map((p) => ({ slug: p.slug, name: p.name }))}
         />
       </section>
 

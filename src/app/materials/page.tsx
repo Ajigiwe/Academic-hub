@@ -1,11 +1,7 @@
 import Link from "next/link";
 import { getFreeMaterials } from "@/lib/resources";
-import {
-  PROGRAMMES,
-  programmeBySlug,
-  isProgrammeSlug,
-  isLevel,
-} from "@/lib/programmes";
+import { programmeBySlug, isProgrammeSlug, isLevel } from "@/lib/programmes";
+import { getEnabledProgrammes } from "@/lib/settings";
 import { FreeMaterialCard } from "@/components/free-material-card";
 import { RefineBar } from "@/components/refine-bar";
 
@@ -29,7 +25,12 @@ export default async function MaterialsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const sp = await searchParams;
-  const programme = isProgrammeSlug(sp.programme) ? sp.programme : undefined;
+  const enabledProgrammes = await getEnabledProgrammes();
+  const enabledSlugs = enabledProgrammes.map((p) => p.slug);
+  const programme =
+    isProgrammeSlug(sp.programme) && enabledSlugs.includes(sp.programme)
+      ? sp.programme
+      : undefined;
   const level = isLevel(Number(sp.level)) ? Number(sp.level) : undefined;
   const semester =
     sp.semester === "1" || sp.semester === "2" ? Number(sp.semester) : undefined;
@@ -37,7 +38,7 @@ export default async function MaterialsPage({
   const filtered = Boolean(programme || level || semester);
   const programmeMeta = programmeBySlug(programme);
 
-  const materials = await getFreeMaterials({ programme, level, semester });
+  const materials = await getFreeMaterials({ programme, level, semester }, enabledSlugs);
 
   const chips = [
     programmeMeta ? programmeMeta.short : null,
@@ -77,6 +78,7 @@ export default async function MaterialsPage({
       {/* In-place refinement — works with any combination of filters */}
       <RefineBar
         base="/materials"
+        programmes={enabledProgrammes.map((p) => ({ slug: p.slug, short: p.short }))}
         programme={programme}
         level={level}
         semester={semester}

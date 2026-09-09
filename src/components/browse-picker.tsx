@@ -55,8 +55,14 @@ function saveChoice(c: Omit<SavedChoice, "savedAt">): void {
  * and programme. Returning visitors get their last completed selection
  * prefilled from localStorage as a one-tap "welcome back" shortcut.
  */
-export function BrowsePicker() {
+export function BrowsePicker({
+  enabledSlugs,
+}: {
+  /** Programme tracks the visitor may pick (disabled ones are hidden). */
+  enabledSlugs: ProgrammeSlug[];
+}) {
   const router = useRouter();
+  const programmes = PROGRAMMES.filter((p) => enabledSlugs.includes(p.slug));
   const [intent, setIntent] = useState<Intent | null>(null);
   const [step, setStep] = useState(0);
   const [level, setLevel] = useState<number | null>(null);
@@ -71,8 +77,13 @@ export function BrowsePicker() {
   useEffect(() => {
     if (restoredOnce.current) return;
     restoredOnce.current = true;
-    setSaved(loadSaved());
-  }, []);
+    // Only offer a welcome-back shortcut if the saved programme is still
+    // enabled — a disabled track is not something students should resume.
+    const savedChoice = loadSaved();
+    setSaved(
+      savedChoice && enabledSlugs.includes(savedChoice.programme) ? savedChoice : null,
+    );
+  }, [enabledSlugs]);
 
   const canNext =
     (step === 0 && level !== null) ||
@@ -345,8 +356,16 @@ export function BrowsePicker() {
                     ? "Last step — your track determines the courses shown."
                     : "Last step — your track determines the materials shown."}
                 </p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  {PROGRAMMES.map((p) => {
+                <div
+                  className={`mt-4 grid gap-3 ${
+                    programmes.length === 1
+                      ? "sm:grid-cols-1 sm:max-w-md"
+                      : programmes.length === 2
+                        ? "sm:grid-cols-2"
+                        : "sm:grid-cols-3"
+                  }`}
+                >
+                  {programmes.map((p) => {
                     const active = programme === p.slug;
                     return (
                       <button

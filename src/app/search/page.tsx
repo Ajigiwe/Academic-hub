@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { searchBundles, getFreeMaterials, getProgrammes, getFilterYears } from "@/lib/resources";
+import { isProgrammeSlug } from "@/lib/programmes";
+import { getEnabledProgrammes } from "@/lib/settings";
 import { BundleCard } from "@/components/bundle-card";
 import { FreeMaterialCard } from "@/components/free-material-card";
 import { FilterPanel } from "@/components/filter-panel";
@@ -20,6 +22,12 @@ export default async function SearchPage({
   searchParams: Promise<SearchParams>;
 }) {
   const sp = await searchParams;
+  const enabledProgrammes = await getEnabledProgrammes();
+  const enabledSlugs = enabledProgrammes.map((p) => p.slug);
+  const programme =
+    isProgrammeSlug(sp.programme) && enabledSlugs.includes(sp.programme)
+      ? sp.programme
+      : undefined;
   const level = sp.level ? Number(sp.level) : undefined;
   const semester = sp.semester ? Number(sp.semester) : undefined;
   const page = sp.page ? Number(sp.page) : 1;
@@ -30,16 +38,16 @@ export default async function SearchPage({
     : "relevance";
 
   const [{ items, total, pages }, freeMaterials, programmes, years] = await Promise.all([
-    searchBundles({ q: sp.q, programme: sp.programme, level, semester, year: sp.year, sort, page }),
+    searchBundles({ q: sp.q, programme, level, semester, year: sp.year, sort, page }, enabledSlugs),
     // Free materials respect the same filters except academic year — they
     // are tagged with the current year, so a year filter would hide them.
-    getFreeMaterials({ q: sp.q, programme: sp.programme, level, semester }),
-    getProgrammes(),
+    getFreeMaterials({ q: sp.q, programme, level, semester }, enabledSlugs),
+    getProgrammes(enabledSlugs),
     getFilterYears(),
   ]);
 
   const hasResults = items.length > 0;
-  const activeFilterCount = [sp.q, sp.programme, sp.level, sp.semester, sp.year].filter(Boolean).length;
+  const activeFilterCount = [sp.q, programme, sp.level, sp.semester, sp.year].filter(Boolean).length;
 
   function pageHref(p: number) {
     const params = new URLSearchParams();
@@ -75,7 +83,7 @@ export default async function SearchPage({
           </div>
           <div>
             <label className="label" htmlFor="programme">Programme</label>
-            <select id="programme" name="programme" defaultValue={sp.programme ?? ""} className="input">
+            <select id="programme" name="programme" defaultValue={programme ?? ""} className="input">
               <option value="">All programmes</option>
               {programmes.map((p) => (
                 <option key={p.id} value={p.slug}>
