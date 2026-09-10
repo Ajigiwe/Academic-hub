@@ -73,8 +73,21 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
           )}
         </div>
 
-        {/* Compact sign-in visible on mobile only */}
-        {!user && (
+        {/* Compact actions visible on mobile only — the desktop cluster
+            (avatar, log out, sign-up) is hidden below md, so signed-in
+            users need their own log-out affordance here. */}
+        {user ? (
+          <div className="flex items-center gap-2 md:hidden">
+            <Link
+              href="/account"
+              aria-label="My account"
+              className="grid h-8 w-8 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-800"
+            >
+              {user.firstName.slice(0, 1).toUpperCase()}
+            </Link>
+            <LogoutButton />
+          </div>
+        ) : (
           <Link href="/login" className="btn-primary btn-sm md:hidden">
             Log in
           </Link>
