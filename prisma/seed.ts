@@ -3,21 +3,22 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-// Sensible defaults for the single-institution MVP: three programme
-// tracks (BTECH / Dip Tech / HND), levels 100–400.
+// Sensible defaults for the single-institution MVP: the four programme
+// (department) tracks, levels 100–400.
 const PROGRAMMES = [
-  { name: "Bachelor of Technology (BTECH)", slug: "btech" },
-  { name: "Diploma in Technology (Dip Tech)", slug: "dip-tech" },
-  { name: "Higher National Diploma (HND)", slug: "hnd" },
+  { name: "Procurement and Supply", slug: "procurement-and-supply" },
+  { name: "Marketing", slug: "marketing" },
+  { name: "Accounting", slug: "accounting" },
+  { name: "Secretaryship and Management", slug: "secretaryship-and-management" },
 ];
 
 const COURSES = [
-  { code: "ICT 201", title: "Database Systems", slug: "ict-201-database-systems" },
-  { code: "ICT 205", title: "Computer Networks", slug: "ict-205-computer-networks" },
-  { code: "ICT 401", title: "Advanced Database Systems", slug: "ict-401-advanced-database-systems" },
-  { code: "STAT 202", title: "Statistics II", slug: "stat-202-statistics-ii" },
-  { code: "BUS 101", title: "Introduction to Business", slug: "bus-101-introduction-to-business" },
-  { code: "CS 305", title: "Database Management", slug: "cs-305-database-management" },
+  { code: "ACC 102", title: "Introduction to Financial Accounting", slug: "acc-102-introduction-to-financial-accounting" },
+  { code: "ACC 201", title: "Financial Reporting", slug: "acc-201-financial-reporting" },
+  { code: "MKT 203", title: "Principles of Marketing", slug: "mkt-203-principles-of-marketing" },
+  { code: "PSM 201", title: "Procurement Principles", slug: "psm-201-procurement-principles" },
+  { code: "PSM 305", title: "Public Procurement", slug: "psm-305-public-procurement" },
+  { code: "SMG 204", title: "Office Administration", slug: "smg-204-office-administration" },
 ];
 
 // Bundles are the unit of sale — one per course + academic year, priced as a
@@ -25,139 +26,140 @@ const COURSES = [
 // tagged with its programme track and level; papers carry the semester.
 const BUNDLES = [
   {
-    slug: "ict-201-database-systems-2024-2025",
-    title: "ICT 201 — Database Systems · 2024/2025 Past Questions",
-    course: "ICT 201",
-    programme: "btech",
-    level: 200,
+    slug: "acc-102-introduction-to-financial-accounting-2024-2025",
+    title: "ACC 102 — Introduction to Financial Accounting · 2024/2025 Past Questions",
+    course: "ACC 102",
+    programme: "accounting",
+    level: 100,
     academicYear: "2024/2025",
-    pricePesewas: 2500,
+    pricePesewas: 1500,
     description:
-      "Complete past questions covering major topics in Database Systems: ER modelling, normalisation, SQL, transactions, and indexing. Includes both semester papers.",
+      "Complete past questions covering the accounting cycle, journal entries, ledgers, trial balance, and basic financial statements — both semester papers included.",
     papers: [
       {
-        slug: "ict-201-database-systems-2024-2025-sem1-exam",
-        title: "ICT 201 — Database Systems · Semester 1 Exam",
+        slug: "acc-102-introduction-to-financial-accounting-2024-2025-sem1-exam",
+        title: "ACC 102 — Introduction to Financial Accounting · Semester 1 Exam",
         semester: 1,
-        pageCount: 28,
+        pageCount: 20,
       },
       {
-        slug: "ict-201-database-systems-2024-2025-sem2-exam",
-        title: "ICT 201 — Database Systems · Semester 2 Exam",
+        slug: "acc-102-introduction-to-financial-accounting-2024-2025-sem2-exam",
+        title: "ACC 102 — Introduction to Financial Accounting · Semester 2 Exam",
         semester: 2,
-        pageCount: 24,
+        pageCount: 18,
       },
     ],
   },
   {
-    slug: "ict-205-computer-networks-2024-2025",
-    title: "ICT 205 — Computer Networks · 2024/2025 Past Questions",
-    course: "ICT 205",
-    programme: "btech",
+    slug: "acc-201-financial-reporting-2024-2025",
+    title: "ACC 201 — Financial Reporting · 2024/2025 Past Questions",
+    course: "ACC 201",
+    programme: "accounting",
     level: 200,
     academicYear: "2024/2025",
     pricePesewas: 2500,
     description:
-      "OSI and TCP/IP models, routing, switching, network security, and wireless networking — both semesters included.",
+      "Past questions on IFRS-based reporting, preparation of company financial statements, consolidation basics, and cash-flow statements.",
     papers: [
       {
-        slug: "ict-205-computer-networks-2024-2025-sem1-exam",
-        title: "ICT 205 — Computer Networks · Semester 1 Exam",
-        semester: 1,
+        slug: "acc-201-financial-reporting-2024-2025-sem2-exam",
+        title: "ACC 201 — Financial Reporting · Semester 2 Exam",
+        semester: 2,
         pageCount: 26,
       },
+    ],
+  },
+  {
+    slug: "mkt-203-principles-of-marketing-2024-2025",
+    title: "MKT 203 — Principles of Marketing · 2024/2025 Past Questions",
+    course: "MKT 203",
+    programme: "marketing",
+    level: 200,
+    academicYear: "2024/2025",
+    pricePesewas: 2000,
+    description:
+      "The marketing mix, segmentation and targeting, consumer behaviour, branding, and digital marketing — both semesters included.",
+    papers: [
       {
-        slug: "ict-205-computer-networks-2024-2025-sem2-exam",
-        title: "ICT 205 — Computer Networks · Semester 2 Exam",
+        slug: "mkt-203-principles-of-marketing-2024-2025-sem1-exam",
+        title: "MKT 203 — Principles of Marketing · Semester 1 Exam",
+        semester: 1,
+        pageCount: 22,
+      },
+    ],
+  },
+  {
+    slug: "psm-201-procurement-principles-2024-2025",
+    title: "PSM 201 — Procurement Principles · 2024/2025 Past Questions",
+    course: "PSM 201",
+    programme: "procurement-and-supply",
+    level: 200,
+    academicYear: "2024/2025",
+    pricePesewas: 2200,
+    description:
+      "Procurement cycle, sourcing and supplier selection, tendering, contract management, and ethics in procurement — both semesters included.",
+    papers: [
+      {
+        slug: "psm-201-procurement-principles-2024-2025-sem1-exam",
+        title: "PSM 201 — Procurement Principles · Semester 1 Exam",
+        semester: 1,
+        pageCount: 24,
+      },
+      {
+        slug: "psm-201-procurement-principles-2024-2025-sem2-exam",
+        title: "PSM 201 — Procurement Principles · Semester 2 Exam",
         semester: 2,
         pageCount: 21,
       },
     ],
   },
   {
-    slug: "stat-202-statistics-ii-2023-2024",
-    title: "STAT 202 — Statistics II · 2023/2024 Past Questions",
-    course: "STAT 202",
-    programme: "dip-tech",
-    level: 200,
-    academicYear: "2023/2024",
-    pricePesewas: 2000,
-    description:
-      "Past questions on hypothesis testing, regression, ANOVA, and probability distributions — both semesters included.",
-    papers: [
-      {
-        slug: "stat-202-statistics-ii-2023-2024-sem2-exam",
-        title: "STAT 202 — Statistics II · Semester 2 Exam",
-        semester: 2,
-        pageCount: 22,
-      },
-    ],
-  },
-  {
-    slug: "ict-401-advanced-database-systems-2024-2025",
-    title: "ICT 401 — Advanced Database Systems · 2024/2025 Past Questions",
-    course: "ICT 401",
-    programme: "btech",
-    level: 400,
+    slug: "psm-305-public-procurement-2024-2025",
+    title: "PSM 305 — Public Procurement · 2024/2025 Past Questions",
+    course: "PSM 305",
+    programme: "procurement-and-supply",
+    level: 300,
     academicYear: "2024/2025",
     pricePesewas: 3000,
     description:
-      "Distributed databases, query optimisation, concurrency control, and NoSQL storage models — full exam coverage.",
+      "The Public Procurement Act, procurement planning, methods of procurement, evaluation criteria, and dispute resolution — full exam coverage.",
     papers: [
       {
-        slug: "ict-401-advanced-database-systems-2024-2025-sem2-exam",
-        title: "ICT 401 — Advanced Database Systems · Semester 2 Exam",
+        slug: "psm-305-public-procurement-2024-2025-sem1-exam",
+        title: "PSM 305 — Public Procurement · Semester 1 Exam",
+        semester: 1,
+        pageCount: 28,
+      },
+    ],
+  },
+  {
+    slug: "smg-204-office-administration-2023-2024",
+    title: "SMG 204 — Office Administration · 2023/2024 Past Questions",
+    course: "SMG 204",
+    programme: "secretaryship-and-management",
+    level: 200,
+    academicYear: "2023/2024",
+    pricePesewas: 1800,
+    description:
+      "Office procedures, records management, business communication, meeting documentation, and office technology questions.",
+    papers: [
+      {
+        slug: "smg-204-office-administration-2023-2024-sem2-exam",
+        title: "SMG 204 — Office Administration · Semester 2 Exam",
         semester: 2,
-        pageCount: 31,
-      },
-    ],
-  },
-  {
-    slug: "bus-101-introduction-to-business-2025-2026",
-    title: "BUS 101 — Introduction to Business · 2025/2026 Past Questions",
-    course: "BUS 101",
-    programme: "btech",
-    level: 100,
-    academicYear: "2025/2026",
-    pricePesewas: 1500,
-    description:
-      "Business environment, forms of ownership, management functions, and marketing basics — the full first-year paper set.",
-    papers: [
-      {
-        slug: "bus-101-introduction-to-business-2025-2026-sem1-exam",
-        title: "BUS 101 — Introduction to Business · Semester 1 Exam",
-        semester: 1,
-        pageCount: 18,
-      },
-    ],
-  },
-  {
-    slug: "cs-305-database-management-2024-2025",
-    title: "CS 305 — Database Management · 2024/2025 Past Questions",
-    course: "CS 305",
-    programme: "hnd",
-    level: 300,
-    academicYear: "2024/2025",
-    pricePesewas: 2200,
-    description:
-      "Data modelling, SQL, normalisation and database administration questions from both semesters.",
-    papers: [
-      {
-        slug: "cs-305-database-management-2024-2025-sem1-exam",
-        title: "CS 305 — Database Management · Semester 1 Exam",
-        semester: 1,
-        pageCount: 24,
+        pageCount: 19,
       },
     ],
   },
 ];
 
-// Default visibility flags — only BTECH is live for now; the other
+// Default visibility flags — only Accounting is live for now; the other
 // tracks can be switched on later from Admin → Settings.
 const PROGRAMME_SETTINGS = [
-  { key: "programme.btech.enabled", value: "true" },
-  { key: "programme.dip-tech.enabled", value: "false" },
-  { key: "programme.hnd.enabled", value: "false" },
+  { key: "programme.procurement-and-supply.enabled", value: "true" },
+  { key: "programme.marketing.enabled", value: "true" },
+  { key: "programme.accounting.enabled", value: "true" },
+  { key: "programme.secretaryship-and-management.enabled", value: "true" },
 ];
 
 async function main() {

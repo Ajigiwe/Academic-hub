@@ -15,8 +15,7 @@ import {
   slugify,
 } from "@/lib/resource-admin";
 import { grantBundlePapersToPastBuyers } from "@/lib/entitlement-grant";
-import { PROGRAMME_SLUGS } from "@/lib/programmes";
-import { programmeSettingKey } from "@/lib/settings";
+import { programmeSettingKey, getAllProgrammesWithVisibility } from "@/lib/settings";
 
 /**
  * Guard for every admin action. Server actions are ordinary HTTP
@@ -439,14 +438,17 @@ export async function deleteDraftAction(formData: FormData): Promise<void> {
  * Persist programme visibility. A checked box means the programme is
  * live for students; unchecked hides it from browsing, filters, and
  * search (content stays in the catalogue). Re-enabling restores it.
+ * Covers every programme row in the DB, not just the seeded defaults.
  */
 export async function saveProgrammeSettingsAction(formData: FormData): Promise<void> {
   const admin = await requireAdminUser();
   if (!admin) return;
 
+  const programmes = await getAllProgrammesWithVisibility();
+
   await prisma.$transaction(
-    PROGRAMME_SLUGS.map((slug) => {
-      const key = programmeSettingKey(slug);
+    programmes.map((p) => {
+      const key = programmeSettingKey(p.slug);
       const value = formData.get(key) !== null ? "true" : "false";
       return prisma.setting.upsert({
         where: { key },
@@ -455,6 +457,68 @@ export async function saveProgrammeSettingsAction(formData: FormData): Promise<v
       });
     }),
   );
+
+  revalidatePath("/admin/settings");
+  revalidatePath("/");
+  revalidatePath("/courses");
+  revalidatePath("/materials");
+  revalidatePath("/search");
+}
+
+/**
+ * Add a new programme track. The slug is generated from the name; the
+ * track starts ENABLED so it appears in the student browse flow right
+ * away (and can be toggled off like any other).
+ */
+export async function addProgrammeAction(formData: FormData): Promise<void> {
+  const admin = await requireAdminUser();
+  if (!admin) return;
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (name.length < 2 || name.length > 120) return;
+
+  const slug = slugify(name);
+  if (!slug) return;
+
+  // Name and slug are both unique — upsert keeps repeated submits safe.
+  await prisma.programme.upsert({
+    where: { slug },
+    update: { name },
+    create: { name, slug },
+  });
+  await prisma.setting.upsert({
+    where: { key: programmeSettingKey(slug) },
+    update: { value: "true" },
+    create: { key: programmeSettingKey(slug), value: "true" },
+  });
+
+  revalidatePath("/admin/settings");
+  revalidatePath("/");
+  revalidatePath("/courses");
+  revalidatePath("/materials");
+  revalidatePath("/search");
+}
+
+/**
+ * Delete a programme track. Only allowed when it has no bundles or
+ * resources — hiding content is what the visibility toggle is for.
+ */
+export async function deleteProgrammeAction(formData: FormData): Promise<void> {
+  const admin = await requireAdminUser();
+  if (!admin) return;
+
+  const slug = String(formData.get("slug") ?? "").trim();
+  if (!slug) return;
+
+  const programme = await prisma.programme.findUnique({
+    where: { slug },
+    select: { id: true, _count: { select: { bundles: true, resources: true } } },
+  });
+  if (!programme) return;
+  if (programme._count.bundles > 0 || programme._count.resources > 0) return;
+
+  await prisma.programme.delete({ where: { id: programme.id } });
+  await prisma.setting.deleteMany({ where: { key: programmeSettingKey(slug) } });
 
   revalidatePath("/admin/settings");
   revalidatePath("/");

@@ -2,13 +2,14 @@ import Link from "next/link";
 import {
   searchBundles,
   getFreeMaterials,
+  getProgrammeContentCounts,
   type SearchBundleItem,
 } from "@/lib/resources";
-import { programmeBySlug, isProgrammeSlug, isLevel } from "@/lib/programmes";
+import { isLevel, programmeBySlug } from "@/lib/programmes";
 import { getEnabledProgrammes } from "@/lib/settings";
 import { BundleCard } from "@/components/bundle-card";
 import { FreeMaterialCard } from "@/components/free-material-card";
-import { RefineBar } from "@/components/refine-bar";
+import { BrowseFlow } from "@/components/browse-flow";
 
 interface SearchParams {
   programme?: string;
@@ -19,9 +20,9 @@ interface SearchParams {
 const SEMESTER_LABEL = { 1: "First Semester", 2: "Second Semester" } as const;
 
 export const metadata = {
-  title: "Courses — Academic Resource Hub",
+  title: "Past Questions — Academic Resource Hub",
   description:
-    "Find past questions and free study materials by programme, level, and semester.",
+    "Pick your programme, level, and semester to find past questions for your courses.",
 };
 
 export default async function CoursesPage({
@@ -32,22 +33,28 @@ export default async function CoursesPage({
   const sp = await searchParams;
   const enabledProgrammes = await getEnabledProgrammes();
   const enabledSlugs = enabledProgrammes.map((p) => p.slug);
-  const programme =
-    isProgrammeSlug(sp.programme) && enabledSlugs.includes(sp.programme)
-      ? sp.programme
-      : undefined;
+
+  // A choice is only accepted when the programme is admin-enabled.
+  const programme = enabledSlugs.includes(sp.programme ?? "")
+    ? sp.programme!
+    : undefined;
   const level = isLevel(Number(sp.level)) ? Number(sp.level) : undefined;
   const semester = sp.semester === "1" || sp.semester === "2" ? Number(sp.semester) : undefined;
 
-  const guided = Boolean(programme && level && semester);
   const anyFilter = Boolean(programme || level || semester);
   const programmeMeta = programmeBySlug(programme);
 
-  const [{ items, total }, freeMaterials] = await Promise.all([
-    anyFilter
+  // The library only renders once ALL THREE steps are complete.
+  const guided = Boolean(programme && level && semester);
+
+  const [{ items, total }, freeMaterials, contentCounts] = await Promise.all([
+    guided
       ? searchBundles({ programme, level, semester, perPage: 50 }, enabledSlugs)
       : Promise.resolve({ items: [], total: 0 }),
-    getFreeMaterials({ programme, level, semester }, enabledSlugs),
+    guided
+      ? getFreeMaterials({ programme, level, semester }, enabledSlugs)
+      : Promise.resolve([]),
+    getProgrammeContentCounts(enabledSlugs),
   ]);
 
   const grouped = new Map<string, SearchBundleItem[]>();
@@ -57,6 +64,12 @@ export default async function CoursesPage({
     grouped.get(code)!.push(b);
   }
 
+  const chips = [
+    programmeMeta?.short,
+    level ? `Level ${level}` : undefined,
+    semester ? SEMESTER_LABEL[semester as 1 | 2] : undefined,
+  ].filter(Boolean) as string[];
+
   return (
     <div className="container-page py-8">
       {/* Breadcrumb + context */}
@@ -65,55 +78,48 @@ export default async function CoursesPage({
           Home
         </Link>
         <span className="mx-1.5 text-neutral-300">/</span>
-        <span className="text-neutral-700">Courses</span>
+        <span className="text-neutral-700">Past questions</span>
       </nav>
 
-      <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
-            {anyFilter
-              ? [
-                  programmeMeta?.short,
-                  level ? `Level ${level}` : undefined,
-                  semester ? SEMESTER_LABEL[semester as 1 | 2] : undefined,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")
-              : "Courses & materials"}
-          </h1>
-          <p className="mt-1 text-sm text-neutral-600">
-            {anyFilter
-              ? `${total} course bundle${total === 1 ? "" : "s"} for sale, plus free materials — one price unlocks every paper in a bundle.`
-              : "Filter by programme, year, and semester to see the courses you can pay for."}
-          </p>
-        </div>
-        <Link href="/#browse" className="btn-secondary btn-sm">
-          Guided picker
-        </Link>
+      <div className="mt-3">
+        <h1 className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
+          {guided ? chips.join(" · ") : "Past questions"}
+        </h1>
+        <p className="mt-1 text-sm text-neutral-600">
+          {guided
+            ? `${total} course bundle${total === 1 ? "" : "s"} for sale, plus free materials — one price unlocks every paper in a bundle.`
+            : "Tell us your programme, level, and semester — we'll show your library."}
+        </p>
       </div>
 
-      {/* In-place refinement — works with any combination of filters */}
-      <RefineBar
-        base="/courses"
-        programmes={enabledProgrammes.map((p) => ({ slug: p.slug, short: p.short }))}
-        programme={programme}
-        level={level}
-        semester={semester}
-        resultLabel={`${total} bundle${total === 1 ? "" : "s"} · ${freeMaterials.length} free material${freeMaterials.length === 1 ? "" : "s"}`}
-      />
+      {/* The 3-step flow. Once all three are committed the flow collapses
+          into a summary bar and the library appears below. */}
+      <div className="mt-6">
+        <BrowseFlow
+          base="/courses"
+          programmes={enabledProgrammes.map((p) => ({
+            slug: p.slug,
+            name: p.name,
+            bundles: contentCounts.get(p.slug)?.bundles ?? 0,
+            materials: contentCounts.get(p.slug)?.materials ?? 0,
+          }))}
+          programme={programme}
+          level={level}
+          semester={semester}
+          doneLabel="Show my past questions →"
+        />
+      </div>
 
-      {!anyFilter ? (
-        <div className="card-padded mt-6 py-16 text-center">
+      {!guided ? (
+        <div className="card-padded mt-6 py-12 text-center">
           <p className="font-medium text-neutral-800">
-            Choose your programme, year, and semester above
+            Complete the three steps above
           </p>
           <p className="mx-auto mt-1 max-w-md text-sm text-neutral-600">
-            Or use the guided picker on the homepage — it walks you through
-            the three steps and shows the courses you can pay for.
+            {anyFilter
+              ? "One more selection and we'll show the bundles for your course."
+              : "Your programme, level, and semester — then the library opens."}
           </p>
-          <Link href="/#browse" className="btn-primary mt-5">
-            Open the guided picker →
-          </Link>
         </div>
       ) : (
         <>
@@ -148,14 +154,13 @@ export default async function CoursesPage({
                 No past-question bundles here yet
               </p>
               <p className="mx-auto mt-1 max-w-md text-sm text-neutral-600">
-                Papers for {programmeMeta?.short} · Level {level} ·{" "}
-                {SEMESTER_LABEL[semester as 1 | 2]} are on the way — free
-                materials below, or check back soon.
+                Papers for {chips.join(" · ")} are on the way — free materials
+                below, or check back soon.
               </p>
             </section>
           )}
 
-          {/* Free materials */}
+          {/* Free materials matching the same three filters */}
           {freeMaterials.length > 0 && (
             <section className="mt-12">
               <div className="flex items-baseline justify-between gap-2">
@@ -167,7 +172,8 @@ export default async function CoursesPage({
                 </span>
               </div>
               <p className="mt-0.5 text-sm text-neutral-500">
-                Slides, notes, and revision packs — download them free.
+                Slides, notes, and revision packs for your selection — free to
+                download.
               </p>
               <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {freeMaterials.map((m) => (
@@ -179,7 +185,7 @@ export default async function CoursesPage({
 
           {grouped.size === 0 && freeMaterials.length === 0 && (
             <p className="mt-8 text-center text-sm text-neutral-500">
-              Nothing here yet — try another year or semester.
+              Nothing here yet — try another semester or level.
             </p>
           )}
         </>
@@ -187,4 +193,3 @@ export default async function CoursesPage({
     </div>
   );
 }
-

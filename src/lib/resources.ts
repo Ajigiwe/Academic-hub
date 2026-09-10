@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
-import { PROGRAMME_SLUGS } from "@/lib/programmes";
 
 /**
  * Catalog queries for BUNDLES — the unit of sale. Students buy one
@@ -151,12 +150,37 @@ export async function getPublishedResourceBySlug(slug: string) {
   });
 }
 
-export async function getProgrammes(enabledProgrammes?: string[]) {
-  return prisma.programme.findMany({
-    where: { slug: { in: enabledProgrammes ?? PROGRAMME_SLUGS } },
-    orderBy: { name: "asc" },
-    include: { _count: { select: { bundles: { where: { status: "PUBLISHED" } } } } },
+export interface ProgrammeContentCounts {
+  bundles: number;
+  materials: number;
+}
+
+/**
+ * Per-programme content counts for the step-1 programme cards: published
+ * bundles for sale and published free materials (bundle-less resources),
+ * keyed by programme slug. Restricted to the enabled slugs when provided.
+ */
+export async function getProgrammeContentCounts(
+  enabledProgrammes?: string[],
+): Promise<Map<string, ProgrammeContentCounts>> {
+  const rows = await prisma.programme.findMany({
+    where: enabledProgrammes ? { slug: { in: enabledProgrammes } } : undefined,
+    select: {
+      slug: true,
+      _count: {
+        select: {
+          bundles: { where: { status: "PUBLISHED" } },
+          resources: { where: { status: "PUBLISHED", bundleId: null } },
+        },
+      },
+    },
   });
+  return new Map(
+    rows.map((r) => [
+      r.slug,
+      { bundles: r._count.bundles, materials: r._count.resources },
+    ]),
+  );
 }
 
 export async function getFilterYears(): Promise<string[]> {

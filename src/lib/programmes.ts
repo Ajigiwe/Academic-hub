@@ -1,13 +1,15 @@
 /**
- * The three canonical programmes. Every upload form, browse filter, and
- * picker uses this single list so the catalogue stays consistent.
- * Full name is what's stored in the Programme model; slug is used in
- * URLs and filters; short is the compact label shown in pills/badges.
+ * The four canonical programmes (departments). Every upload form, browse
+ * filter, and picker uses this single list so the catalogue stays
+ * consistent. Full name is what's stored in the Programme model; slug is
+ * used in URLs and filters; short is the compact label shown in
+ * pills/badges.
  */
 export const PROGRAMMES = [
-  { name: "Bachelor of Technology (BTECH)", slug: "btech", short: "BTECH" },
-  { name: "Diploma in Technology (Dip Tech)", slug: "dip-tech", short: "Dip Tech" },
-  { name: "Higher National Diploma (HND)", slug: "hnd", short: "HND" },
+  { name: "Procurement and Supply", slug: "procurement-and-supply", short: "Procurement" },
+  { name: "Marketing", slug: "marketing", short: "Marketing" },
+  { name: "Accounting", slug: "accounting", short: "Accounting" },
+  { name: "Secretaryship and Management", slug: "secretaryship-and-management", short: "Secretaryship" },
 ] as const;
 
 export type ProgrammeSlug = (typeof PROGRAMMES)[number]["slug"];

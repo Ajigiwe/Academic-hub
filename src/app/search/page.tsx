@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { searchBundles, getFreeMaterials, getProgrammes, getFilterYears } from "@/lib/resources";
-import { isProgrammeSlug } from "@/lib/programmes";
+import { searchBundles, getFreeMaterials, getFilterYears } from "@/lib/resources";
 import { getEnabledProgrammes } from "@/lib/settings";
 import { BundleCard } from "@/components/bundle-card";
 import { FreeMaterialCard } from "@/components/free-material-card";
@@ -25,9 +24,7 @@ export default async function SearchPage({
   const enabledProgrammes = await getEnabledProgrammes();
   const enabledSlugs = enabledProgrammes.map((p) => p.slug);
   const programme =
-    isProgrammeSlug(sp.programme) && enabledSlugs.includes(sp.programme)
-      ? sp.programme
-      : undefined;
+    sp.programme && enabledSlugs.includes(sp.programme) ? sp.programme : undefined;
   const level = sp.level ? Number(sp.level) : undefined;
   const semester = sp.semester ? Number(sp.semester) : undefined;
   const page = sp.page ? Number(sp.page) : 1;
@@ -37,12 +34,11 @@ export default async function SearchPage({
     ? (sp.sort as "relevance" | "newest" | "popular" | "price_asc" | "price_desc")
     : "relevance";
 
-  const [{ items, total, pages }, freeMaterials, programmes, years] = await Promise.all([
+  const [{ items, total, pages }, freeMaterials, years] = await Promise.all([
     searchBundles({ q: sp.q, programme, level, semester, year: sp.year, sort, page }, enabledSlugs),
     // Free materials respect the same filters except academic year — they
     // are tagged with the current year, so a year filter would hide them.
     getFreeMaterials({ q: sp.q, programme, level, semester }, enabledSlugs),
-    getProgrammes(enabledSlugs),
     getFilterYears(),
   ]);
 
@@ -82,34 +78,21 @@ export default async function SearchPage({
             <input id="q" name="q" defaultValue={sp.q ?? ""} className="input" placeholder="Course code, title…" />
           </div>
           <div>
-            <label className="label" htmlFor="programme">Programme</label>
-            <select id="programme" name="programme" defaultValue={programme ?? ""} className="input">
-              <option value="">All programmes</option>
-              {programmes.map((p) => (
-                <option key={p.id} value={p.slug}>
-                  {p.name} ({p._count.bundles})
-                </option>
+            <label className="label" htmlFor="level">Level</label>
+            <select id="level" name="level" defaultValue={sp.level ?? ""} className="input">
+              <option value="">Any</option>
+              {[100, 200, 300, 400].map((l) => (
+                <option key={l} value={l}>Level {l}</option>
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label" htmlFor="level">Level</label>
-              <select id="level" name="level" defaultValue={sp.level ?? ""} className="input">
-                <option value="">Any</option>
-                {[100, 200, 300, 400].map((l) => (
-                  <option key={l} value={l}>Level {l}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="semester">Semester</label>
-              <select id="semester" name="semester" defaultValue={sp.semester ?? ""} className="input">
-                <option value="">Any</option>
-                <option value="1">First</option>
-                <option value="2">Second</option>
-              </select>
-            </div>
+          <div>
+            <label className="label" htmlFor="semester">Semester</label>
+            <select id="semester" name="semester" defaultValue={sp.semester ?? ""} className="input">
+              <option value="">Any</option>
+              <option value="1">First</option>
+              <option value="2">Second</option>
+            </select>
           </div>
           <div>
             <label className="label" htmlFor="year">Academic year</label>
