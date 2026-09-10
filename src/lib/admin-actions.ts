@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -501,28 +502,48 @@ export async function addProgrammeAction(formData: FormData): Promise<void> {
 
 /**
  * Delete a programme track. Only allowed when it has no bundles or
- * resources — hiding content is what the visibility toggle is for.
+ * resources attached — hiding content is what the visibility toggle is
+ * for. Always ends with a redirect back to the settings page carrying a
+ * notice, so the outcome is never a silent no-op (deleted rows vanish
+ * from the page even when the caller is a stale render).
  */
 export async function deleteProgrammeAction(formData: FormData): Promise<void> {
   const admin = await requireAdminUser();
-  if (!admin) return;
+  if (!admin) {
+    redirect("/admin/settings?notice=denied");
+  }
 
   const slug = String(formData.get("slug") ?? "").trim();
-  if (!slug) return;
+  if (!slug) {
+    redirect("/admin/settings?notice=missing");
+  }
 
   const programme = await prisma.programme.findUnique({
     where: { slug },
-    select: { id: true, _count: { select: { bundles: true, resources: true } } },
+    select: { id: true, name: true, _count: { select: { bundles: true, resources: true } } },
   });
-  if (!programme) return;
-  if (programme._count.bundles > 0 || programme._count.resources > 0) return;
+  if (!programme) {
+    // Already gone (e.g. double submit) — nothing left to do.
+    redirect("/admin/settings?notice=deleted");
+  }
+  if (programme._count.bundles > 0 || programme._count.resources > 0) {
+    redirect(
+      `/admin/settings?notice=blocked&name=${encodeURIComponent(programme.name)}` +
+        `&bundles=${programme._count.bundles}&resources=${programme._count.resources}`,
+    );
+  }
 
-  await prisma.programme.delete({ where: { id: programme.id } });
-  await prisma.setting.deleteMany({ where: { key: programmeSettingKey(slug) } });
+  await prisma.$transaction([
+    prisma.setting.deleteMany({ where: { key: programmeSettingKey(slug) } }),
+    prisma.programme.delete({ where: { id: programme.id } }),
+  ]);
 
   revalidatePath("/admin/settings");
   revalidatePath("/");
   revalidatePath("/courses");
   revalidatePath("/materials");
   revalidatePath("/search");
+  redirect(
+    `/admin/settings?notice=deleted&name=${encodeURIComponent(programme.name)}`,
+  );
 }

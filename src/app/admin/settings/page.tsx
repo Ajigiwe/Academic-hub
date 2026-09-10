@@ -1,4 +1,5 @@
 import { getAllProgrammesWithVisibility, programmeSettingKey } from "@/lib/settings";
+import { getProgrammeContentCounts } from "@/lib/resources";
 import {
   saveProgrammeSettingsAction,
   addProgrammeAction,
@@ -7,8 +8,45 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminSettingsPage() {
+export default async function AdminSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const programmes = await getAllProgrammesWithVisibility();
+  const counts = await getProgrammeContentCounts();
+
+  // Outcome of the last delete attempt, carried by deleteProgrammeAction's
+  // redirect so the result is never a silent no-op.
+  const sp = await searchParams;
+  const notice = typeof sp.notice === "string" ? sp.notice : undefined;
+  const noticeName = typeof sp.name === "string" ? sp.name : undefined;
+  const noticeBundles = Number(sp.bundles ?? 0);
+  const noticeResources = Number(sp.resources ?? 0);
+
+  const noticeBanner =
+    notice === "deleted" ? (
+      <p className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+        {noticeName
+          ? `Programme “${noticeName}” was deleted.`
+          : "Programme deleted."}
+      </p>
+    ) : notice === "blocked" ? (
+      <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        Couldn’t delete {noticeName ? `“${noticeName}”` : "the programme"} — it
+        still has {noticeBundles} bundle{noticeBundles === 1 ? "" : "s"} and{" "}
+        {noticeResources} paper{noticeResources === 1 ? "" : "s"} attached. Move
+        or remove that content first, or just toggle the track off above.
+      </p>
+    ) : notice === "denied" ? (
+      <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        Admin access required.
+      </p>
+    ) : notice === "missing" ? (
+      <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        No programme was selected for deletion.
+      </p>
+    ) : null;
 
   return (
     <div>
@@ -16,6 +54,8 @@ export default async function AdminSettingsPage() {
       <p className="mt-1 text-sm text-neutral-600">
         Platform-wide controls. Changes apply to the public site immediately.
       </p>
+
+      {noticeBanner}
 
       <form
         action={saveProgrammeSettingsAction}
@@ -100,43 +140,64 @@ export default async function AdminSettingsPage() {
         </p>
       </form>
 
-      {/* Remove a programme track */}
-      <form action={deleteProgrammeAction} className="card mt-5 max-w-2xl p-5">
+      {/* Remove a programme track — one form per programme so every
+          button names its target and can grey out content-ful tracks. */}
+      <section className="card mt-5 max-w-2xl p-5">
         <h2 className="text-base font-semibold text-neutral-900">
           Remove a programme
         </h2>
         <p className="mt-1 text-sm text-neutral-600">
-          Deleting a programme is only possible when it has no bundles or
-          resources attached. Tracks you merely want off the site can simply
-          be toggled off above — content stays but is hidden from students.
+          A track can only be deleted once it has no bundles or papers
+          attached. Tracks you merely want off the site can simply be
+          toggled off above — content stays but is hidden from students.
         </p>
         {programmes.length === 0 ? (
           <p className="mt-4 text-sm text-neutral-500">No programmes to remove.</p>
         ) : (
-          <div className="mt-4 flex flex-wrap items-end gap-3">
-            <div className="min-w-0 flex-1">
-              <label className="label" htmlFor="delete-programme-slug">
-                Programme
-              </label>
-              <select
-                id="delete-programme-slug"
-                name="slug"
-                className="input"
-                required
-              >
-                {programmes.map((p) => (
-                  <option key={p.slug} value={p.slug}>
-                    {p.name} ({p.slug})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button type="submit" className="btn-danger">
-              Delete programme
-            </button>
+          <div className="mt-4 space-y-2">
+            {programmes.map((p) => {
+              const count = counts.get(p.slug) ?? { bundles: 0, materials: 0 };
+              const deletable = count.bundles === 0 && count.materials === 0;
+              return (
+                <div
+                  key={p.slug}
+                  className={`flex items-center justify-between gap-4 rounded-xl border px-4 py-3 ${
+                    deletable
+                      ? "border-neutral-200 bg-white"
+                      : "border-neutral-100 bg-neutral-50"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-neutral-900">
+                      {p.name}
+                    </p>
+                    <p className="mt-0.5 text-xs text-neutral-500">
+                      {deletable
+                        ? "No bundles or papers — safe to delete"
+                        : `${count.bundles} bundle${count.bundles === 1 ? "" : "s"} · ${count.materials} paper${count.materials === 1 ? "" : "s"} attached`}
+                    </p>
+                  </div>
+                  <form action={deleteProgrammeAction} className="shrink-0">
+                    <input type="hidden" name="slug" value={p.slug} />
+                    <button
+                      type="submit"
+                      className="btn-danger btn-sm"
+                      disabled={!deletable}
+                      title={
+                        deletable
+                          ? `Delete ${p.name} permanently`
+                          : `${p.name} still has content — unpublish or move it first`
+                      }
+                    >
+                      Delete
+                    </button>
+                  </form>
+                </div>
+              );
+            })}
           </div>
         )}
-      </form>
+      </section>
     </div>
   );
 }
