@@ -56,6 +56,7 @@ export function DocumentViewer({
   const [loadingPages, setLoadingPages] = useState<Set<number>>(new Set());
   const [pageErrors, setPageErrors] = useState<Map<number, string>>(new Map());
 
+  const rootRef = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const pendingScrollTarget = useRef<number | null>(null);
@@ -394,6 +395,76 @@ export function DocumentViewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [total, mode, scrollPage, jumpOpen]);
 
+  // ── Screenshot & leak deterrence ───────────────────────────────
+  // A web page cannot truly prevent OS-level captures (spec §14/§15) —
+  // the burned-in watermark remains the traceability mechanism. These
+  // layers deter casual capture: pages hide whenever the tab loses
+  // visibility or focus, capture hotkeys trigger an instant blackout,
+  // and print/save attempts yield only a notice.
+  const [shielded, setShielded] = useState(false);
+  const [deterrenceNote, setDeterrenceNote] = useState<string | null>(null);
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flashNote = useCallback((message: string) => {
+    setDeterrenceNote(message);
+    if (noteTimer.current) clearTimeout(noteTimer.current);
+    noteTimer.current = setTimeout(() => setDeterrenceNote(null), 2600);
+  }, []);
+
+  useEffect(() => {
+    const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+    const isCaptureKey = (e: KeyboardEvent) =>
+      e.key === "PrintScreen" ||
+      (isMac && e.metaKey && e.shiftKey && ["3", "4", "5", "6"].includes(e.key));
+
+    const shield = () => setShielded(true);
+    const unshield = () => setShielded(false);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") shield();
+      else unshield();
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isCaptureKey(e)) return;
+      shield();
+      // Best-effort: overwrite the clipboard copy Windows makes on key-up.
+      void navigator.clipboard
+        ?.writeText("Screenshots are disabled — pages are watermarked to the reader's account.")
+        .catch(() => undefined);
+      flashNote("Screenshots are disabled — every page is watermarked to you.");
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("blur", shield);
+    window.addEventListener("focus", unshield);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("blur", shield);
+      window.removeEventListener("focus", unshield);
+      document.removeEventListener("keydown", onKeyDown);
+      if (noteTimer.current) clearTimeout(noteTimer.current);
+    };
+  }, [flashNote]);
+
+  // Block the browser's save/print shortcuts (Ctrl/Cmd+S, Ctrl/Cmd+P).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const key = e.key.toLowerCase();
+      if (key === "s" || key === "p") {
+        e.preventDefault();
+        flashNote(
+          key === "p"
+            ? "Printing is disabled — pages are watermarked to you."
+            : "Saving is disabled — pages are watermarked to you.",
+        );
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [flashNote]);
+
   const scrollToPage = useCallback(
     (target: number) => {
       const node = pageRefs.current[target - 1];
@@ -450,7 +521,7 @@ export function DocumentViewer({
   }, []);
 
   const goFullscreen = useCallback(() => {
-    const el = shellRef.current;
+    const el = rootRef.current;
     if (!el) return;
     if (document.fullscreenElement) void document.exitFullscreen();
     else void el.requestFullscreen?.().catch(() => undefined);
@@ -521,9 +592,40 @@ export function DocumentViewer({
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col bg-neutral-100">
+    <div
+      ref={rootRef}
+      className="relative flex h-[calc(100vh-4rem)] flex-col bg-neutral-100"
+    >
+      {/* Screenshot shield: covers the document while the tab is hidden,
+          unfocused, or a capture key was pressed. */}
+      {shielded && (
+        <div className="absolute inset-0 z-50 grid place-items-center bg-neutral-900 text-center print:hidden">
+          <div className="px-6">
+            <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-white/10">
+              <svg className="h-7 w-7 text-neutral-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="m2 2 20 20" />
+                <path d="M6.7 6.7C4.6 8.1 3 10 2 12c1.7 3.5 5.5 6 10 6 1.6 0 3.1-.3 4.5-.9" />
+                <path d="M9.9 4.2A9.8 9.8 0 0 1 12 4c4.5 0 8.3 2.5 10 6a13.4 13.4 0 0 1-2.7 3.7" />
+                <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+              </svg>
+            </span>
+            <p className="mt-4 text-sm font-semibold text-white">Content hidden</p>
+            <p className="mt-1 text-xs text-neutral-400">
+              This paper is watermarked to your account.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Deterrence toast (capture key / blocked save or print). */}
+      {deterrenceNote && (
+        <div className="pointer-events-none absolute left-1/2 top-4 z-50 -translate-x-1/2 whitespace-nowrap rounded-full bg-neutral-900/90 px-4 py-2 text-xs font-semibold text-white shadow-lift print:hidden">
+          {deterrenceNote}
+        </div>
+      )}
+
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-2.5">
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-2.5 print:hidden">
         <h1 className="truncate text-sm font-semibold text-neutral-800">{title}</h1>
         <div className="flex items-center gap-1.5">
           {mounted && offlineSupported() && (
@@ -619,23 +721,24 @@ export function DocumentViewer({
 
       {/* Save error banner */}
       {saveError && (
-        <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-700">
+        <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-700 print:hidden">
           {saveError}
         </div>
       )}
 
       {/* Progress bar */}
-      <div className="h-1 w-full bg-neutral-200">
+      <div className="h-1 w-full bg-neutral-200 print:hidden">
         <div
           className="h-full bg-gradient-to-r from-brand-600 to-brand-500 transition-[width] duration-200"
           style={{ width: `${Math.round(progress * 100)}%` }}
         />
       </div>
 
-      {/* Page canvas */}
+      {/* Page canvas — no context menu, no long-press save, no selection */}
       <div
         ref={shellRef}
-        className="relative flex-1 overflow-auto p-4"
+        onContextMenu={(e) => e.preventDefault()}
+        className="relative flex-1 select-none overflow-auto p-4 [-webkit-touch-callout:none] print:hidden"
       >
         {mode === "single" ? (
           <div className="flex items-start justify-center">
@@ -672,7 +775,7 @@ export function DocumentViewer({
       </div>
 
       {/* Bottom controls */}
-      <div className="relative flex items-center justify-center gap-4 border-t border-neutral-200 bg-white px-4 py-2.5">
+      <div className="relative flex items-center justify-center gap-4 border-t border-neutral-200 bg-white px-4 py-2.5 print:hidden">
         {mode === "single" && (
           <>
             <button
@@ -751,6 +854,15 @@ export function DocumentViewer({
             </button>
           )}
         </div>
+      </div>
+
+      {/* Print guard: the printed page shows only this notice (spec §14). */}
+      <div className="hidden py-20 text-center print:block">
+        <p className="text-lg font-semibold">Printing is not available</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-neutral-600">
+          This paper can only be read in the secure viewer, where every page
+          is watermarked to your account.
+        </p>
       </div>
     </div>
   );
