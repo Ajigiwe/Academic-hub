@@ -153,6 +153,33 @@
   .page-nav button:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
   .page-nav .count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 84px; text-align: center; }
   .loading-note { text-align: center; color: var(--muted); font-size: 13px; padding: 40px 0; }
+
+  /* ── Leak deterrence (parity with the online viewer) ───── */
+  body { -webkit-user-select: none; user-select: none; }
+  .page-shell img { -webkit-touch-callout: none; }
+  #blackout {
+    display: none; position: fixed; inset: 0; z-index: 999;
+    background: #171717; color: #d4d4d4;
+    align-items: center; justify-content: center; text-align: center;
+    padding: 24px; font-size: 14px; line-height: 1.6;
+  }
+  #blackout.active { display: flex; }
+  #blackout strong { color: #fff; font-size: 15px; }
+  #toast {
+    display: none; position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+    z-index: 1000; background: rgb(23 23 23 / .92); color: #fff;
+    font-size: 12.5px; font-weight: 600; padding: 8px 16px;
+    border-radius: 999px; white-space: nowrap;
+  }
+  #printGuard { display: none; }
+  @media print {
+    header, main, #blackout, #toast { display: none !important; }
+    #printGuard {
+      display: block; padding: 60px 24px; text-align: center;
+      font-size: 14px; color: var(--muted);
+    }
+    #printGuard strong { display: block; font-size: 17px; color: var(--text); margin-bottom: 8px; }
+  }
 </style>
 </head>
 <body>
@@ -221,6 +248,14 @@
     </div>
   </section>
 </main>
+
+<!-- Leak deterrence: capture blackout, toast, and print-only guard page -->
+<div id="blackout"><div><strong>Content hidden</strong><br>Screenshots are disabled — pages are watermarked to you.</div></div>
+<div id="toast"></div>
+<div id="printGuard">
+  <strong>Printing is not available</strong>
+  This paper can only be read in the app, where every page is watermarked to your account.
+</div>
 
 <script>
 (function () {
@@ -408,6 +443,50 @@
     if (e.key === "ArrowRight" || e.key === "PageDown") showPage(currentPage + 1, true);
     else if (e.key === "ArrowLeft" || e.key === "PageUp") showPage(currentPage - 1, true);
     else if (e.key === "Escape") closePaper();
+  });
+
+  // ── Leak deterrence (parity with the online viewer) ──────────
+  // A page cannot truly block OS-level screenshots; every cached page
+  // is already watermarked to the reader's account. These layers deter
+  // casual capture and close the browser-level holes (print, save,
+  // long-press image save).
+  var blackout = document.getElementById("blackout");
+  var toast = document.getElementById("toast");
+  var toastTimer = null;
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.style.display = "block";
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.style.display = "none"; }, 2600);
+  }
+  document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  document.addEventListener("keydown", function (e) {
+    var isMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+    var capture = e.key === "PrintScreen" ||
+      (isMac && e.metaKey && e.shiftKey && ["3", "4", "5", "6"].indexOf(e.key) !== -1);
+    if (capture) {
+      blackout.classList.add("active");
+      setTimeout(function () { blackout.classList.remove("active"); }, 1200);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard
+          .writeText("Screenshots are disabled — pages are watermarked to the reader's account.")
+          .catch(function () {});
+      }
+      showToast("Screenshots are disabled — every page is watermarked to you.");
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "s")) {
+      e.preventDefault();
+      showToast(
+        e.key === "p"
+          ? "Printing is disabled — pages are watermarked to you."
+          : "Saving is disabled — pages are watermarked to you."
+      );
+    }
+  });
+  window.addEventListener("blur", function () { blackout.classList.add("active"); });
+  window.addEventListener("focus", function () { blackout.classList.remove("active"); });
+  document.addEventListener("visibilitychange", function () {
+    blackout.classList.toggle("active", document.visibilityState === "hidden");
   });
 
   loadPaperList();
