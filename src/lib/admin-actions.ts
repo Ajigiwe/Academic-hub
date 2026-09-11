@@ -465,8 +465,18 @@ export async function deleteResourceAction(formData: FormData): Promise<void> {
     );
   }
 
-  // ResourceFile rows cascade; entitlements are zero by the guard above.
-  await prisma.resource.delete({ where: { id: resource.id } });
+  try {
+    // ResourceFile rows cascade; entitlements are zero by the guard above.
+    await prisma.resource.delete({ where: { id: resource.id } });
+  } catch (err) {
+    console.error("Failed to delete resource:", err);
+    redirect(
+      deleteNoticeUrl(ADMIN_RESOURCES_PATH, "paper", "blocked", {
+        name: resource.title,
+        sold: 0,
+      }),
+    );
+  }
 
   revalidatePath("/admin/resources");
   revalidatePath("/admin/bundles");
@@ -513,10 +523,20 @@ export async function deleteBundleAction(formData: FormData): Promise<void> {
     );
   }
 
-  await prisma.$transaction([
-    prisma.resource.deleteMany({ where: { bundleId: bundle.id } }),
-    prisma.bundle.delete({ where: { id: bundle.id } }),
-  ]);
+  try {
+    await prisma.$transaction([
+      prisma.resource.deleteMany({ where: { bundleId: bundle.id } }),
+      prisma.bundle.delete({ where: { id: bundle.id } }),
+    ]);
+  } catch (err) {
+    console.error("Failed to delete bundle:", err);
+    redirect(
+      deleteNoticeUrl(ADMIN_BUNDLES_PATH, "bundle", "blocked", {
+        name: bundle.title,
+        sold: 0,
+      }),
+    );
+  }
 
   revalidatePath("/admin/bundles");
   revalidatePath("/admin/resources");

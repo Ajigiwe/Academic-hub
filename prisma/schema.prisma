@@ -344,9 +344,9 @@ model ViewingSession {
   ipAddress   String?  @map("ip_address")
   userAgent   String?  @map("user_agent")
 
-  user        User        @relation(fields: [userId], references: [id])
-  resource    Resource    @relation(fields: [resourceId], references: [id])
-  entitlement Entitlement? @relation(fields: [entitlementId], references: [id])
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resource    Resource    @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  entitlement Entitlement? @relation(fields: [entitlementId], references: [id], onDelete: SetNull)
 
   @@index([userId, resourceId])
   @@map("viewing_sessions")
