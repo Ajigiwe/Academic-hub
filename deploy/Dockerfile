@@ -26,7 +26,9 @@ WORKDIR /app
 # @napi-rs/canvas draws ALL text (watermarks, preview marks) through
 # fontconfig — on bare alpine there are zero fonts and fillText
 # silently produces nothing, so pages render blank of any text.
-RUN apk add --no-cache fontconfig font-dejavu
+# jpeg-turbo is required for pdf.js to decode JPEG images inside PDFs;
+# without it any PDF containing photos / scans fails to render.
+RUN apk add --no-cache fontconfig font-dejavu jpeg-turbo
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
