@@ -89,7 +89,6 @@ export default async function MaterialsPage({
           programme={programme}
           level={level}
           semester={semester}
-          doneLabel="Show my materials →"
         />
       </div>
 

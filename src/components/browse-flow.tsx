@@ -79,7 +79,6 @@ export function BrowseFlow({
   programme,
   level,
   semester,
-  doneLabel,
 }: {
   /** Results route this flow feeds, e.g. "/courses" or "/materials". */
   base: string;
@@ -88,8 +87,6 @@ export function BrowseFlow({
   programme?: string;
   level?: number;
   semester?: number;
-  /** CTA label on the last step, e.g. "Show my past questions →". */
-  doneLabel: string;
 }) {
   const router = useRouter();
   // Selections made inside the flow before committing (URL drives the
@@ -110,18 +107,6 @@ export function BrowseFlow({
     if (next.level) params.set("level", String(next.level));
     if (next.semester) params.set("semester", String(next.semester));
     router.push(`${base}?${params.toString()}`);
-  }
-
-  const canContinue =
-    (step === 0 && !!selProgramme) ||
-    (step === 1 && !!selLevel) ||
-    (step === 2 && !!selSemester);
-
-  function onContinue() {
-    if (step === 0 && selProgramme) go({ programme: selProgramme });
-    else if (step === 1 && selLevel && programme) go({ programme, level: selLevel });
-    else if (step === 2 && selSemester && programme && level)
-      go({ programme, level, semester: selSemester });
   }
 
   return (
@@ -184,7 +169,7 @@ export function BrowseFlow({
                 <ChoiceButton
                   key={p.slug}
                   active={selProgramme === p.slug}
-                  onClick={() => setDraftProgramme(p.slug)}
+                  onClick={() => go({ programme: p.slug })}
                 >
                   <span
                     className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
@@ -228,11 +213,11 @@ export function BrowseFlow({
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {LEVELS.map((l) => (
               <ChoiceButton
-                key={l}
-                active={selLevel === l}
-                onClick={() => setDraftLevel(l)}
-                className="text-center"
-              >
+                  key={l}
+                  active={selLevel === l}
+                  onClick={() => programme && go({ programme, level: l })}
+                  className="text-center"
+                >
                 <span className="block text-xl font-bold tracking-tight text-neutral-900">
                   {l}
                 </span>
@@ -262,10 +247,12 @@ export function BrowseFlow({
           <div className="mt-4 grid grid-cols-2 gap-3 sm:max-w-md">
             {SEMESTERS.map((s) => (
               <ChoiceButton
-                key={s.value}
-                active={selSemester === s.value}
-                onClick={() => setDraftSemester(s.value)}
-              >
+                  key={s.value}
+                  active={selSemester === s.value}
+                  onClick={() =>
+                    programme && level && go({ programme, level, semester: s.value })
+                  }
+                >
                 <span className="block text-sm font-bold text-neutral-900">{s.label}</span>
                 <span className="text-xs text-neutral-500">{s.sub}</span>
               </ChoiceButton>
@@ -289,14 +276,6 @@ export function BrowseFlow({
             ← Back
           </button>
         )}
-        <button
-          type="button"
-          onClick={onContinue}
-          disabled={!canContinue}
-          className="btn-primary"
-        >
-          {step < 2 ? "Continue" : doneLabel}
-        </button>
       </div>
 
     </div>

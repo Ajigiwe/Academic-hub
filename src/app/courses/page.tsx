@@ -106,7 +106,6 @@ export default async function CoursesPage({
           programme={programme}
           level={level}
           semester={semester}
-          doneLabel="Show my past questions →"
         />
       </div>
 
