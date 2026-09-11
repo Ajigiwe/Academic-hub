@@ -63,6 +63,11 @@ async function loadDocument(data: Uint8Array) {
     disableFontFace: true,
     standardFontDataUrl: pdfjs.GlobalWorkerOptions.standardFontDataUrl,
     password: "",
+    // Limit image decoding to avoid crashes on corrupt/unusual streams.
+    maxImageSize: 1024 * 1024,
+    // cMap + standardFontData for CJK / legacy fonts.
+    cMapUrl: pdfjs.GlobalWorkerOptions.standardFontDataUrl,
+    cMapPacked: true,
   }).promise;
 }
 
@@ -140,25 +145,56 @@ export async function renderPageToPng(
     const page = await doc.getPage(pageNumber);
     const viewport = page.getViewport({ scale: 1 });
 
-    // 1) Rasterize the page onto a server-side canvas.
-    const canvas = createCanvas(
-      Math.floor(viewport.width * renderScale),
-      Math.floor(viewport.height * renderScale),
-    );
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    await page.render({
-      canvasContext: ctx,
-      viewport: page.getViewport({ scale: renderScale }),
-    }).promise;
-    page.cleanup();
+    // Cap canvas size to avoid OOM / Skia crashes on huge pages.
+    const maxDim = 4096;
+    let scale = renderScale;
+    while (
+      Math.floor(viewport.width * scale) > maxDim ||
+      Math.floor(viewport.height * scale) > maxDim
+    ) {
+      scale = Math.max(1, scale - 0.5);
+    }
 
-    // 2) Burn the identity marks into the same canvas — the client
-    //    receives flattened PNG bytes, never a PDF, never separable marks.
-    burnWatermark(canvas.getContext("2d"), canvas.width, canvas.height, identity);
-    const png = await canvas.encode("png");
-    return { png };
+    // Try rendering; if it fails (e.g. unsupported canvas op for images),
+    // retry at scale-1 and then scale-2 before giving up.
+    for (const attemptScale of [scale, Math.max(1, scale - 1), 1]) {
+      const canvas = createCanvas(
+        Math.floor(viewport.width * attemptScale),
+        Math.floor(viewport.height * attemptScale),
+      );
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const renderTask = page.render({
+        canvasContext: ctx,
+        viewport: page.getViewport({ scale: attemptScale }),
+      });
+
+      try {
+        await renderTask.promise;
+      } catch (renderErr) {
+        console.error(
+          `pdf.js render failed for page ${pageNumber} at scale ${attemptScale}:`,
+          renderErr,
+        );
+        page.cleanup();
+        continue; // retry at lower scale
+      }
+
+      page.cleanup();
+
+      burnWatermark(
+        canvas.getContext("2d"),
+        canvas.width,
+        canvas.height,
+        identity,
+      );
+      const png = await canvas.encode("png");
+      return { png };
+    }
+
+    throw new Error(`Page ${pageNumber} could not be rendered at any scale.`);
   } finally {
     await doc.destroy();
   }
@@ -273,7 +309,15 @@ export async function renderPageCached(
     if (name === "InvalidPDFException") {
       return { error: "This file could not be rendered as a PDF.", status: 422 };
     }
-    throw err;
+    // Catch rendering failures (missing image codecs, unsupported features,
+    // canvas errors) instead of letting them bubble up as 500s.
+    console.error(`Render failed for page ${pageNumber}:`, err);
+    return {
+      error: `Page ${pageNumber} could not be rendered. ${
+        err instanceof Error ? err.message : ""
+      }`.trim(),
+      status: 422,
+    };
   }
 
   if (pageCache.size >= PAGE_CACHE_MAX) {
