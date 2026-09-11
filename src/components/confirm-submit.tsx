@@ -37,19 +37,18 @@ export function ConfirmSubmit({
       </button>
 
       {open && (
-        <dialog
-          open
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
           onClick={(e) => {
             if (e.target === e.currentTarget) setOpen(false);
           }}
         >
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
             <h3 className="text-lg font-semibold text-neutral-900">
               Confirm deletion
             </h3>
             <p className="mt-2 text-sm text-neutral-600">{message}</p>
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex justify-center gap-3">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -66,7 +65,7 @@ export function ConfirmSubmit({
               </button>
             </div>
           </div>
-        </dialog>
+        </div>
       )}
     </>
   );
