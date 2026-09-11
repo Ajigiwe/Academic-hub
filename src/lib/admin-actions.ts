@@ -416,19 +416,116 @@ export async function setResourceStatusAction(formData: FormData): Promise<void>
   revalidatePath("/");
 }
 
-export async function deleteDraftAction(formData: FormData): Promise<void> {
+// ─────────────────────────────────────────────────────────────────
+// Deleting papers & bundles
+// ─────────────────────────────────────────────────────────────────
+
+const ADMIN_RESOURCES_PATH = "/admin/resources";
+const ADMIN_BUNDLES_PATH = "/admin/bundles";
+
+function deleteNoticeUrl(
+  base: string,
+  kind: "paper" | "bundle",
+  outcome: "deleted" | "blocked" | "denied" | "missing",
+  opts?: { name?: string; sold?: number },
+): string {
+  const params = new URLSearchParams({ notice: outcome, kind });
+  if (opts?.name) params.set("name", opts.name);
+  if (opts?.sold !== undefined) params.set("sold", String(opts.sold));
+  return `${base}?${params.toString()}`;
+}
+
+/**
+ * Delete ONE paper (bundle paper or free material). Anything a paid order
+ * references is protected — buyers keep access to what they paid for —
+ * but unsold papers can be removed outright. Always ends with a redirect
+ * carrying a notice so the outcome is never a silent no-op; an already-
+ * deleted id (double submit) reports success.
+ */
+export async function deleteResourceAction(formData: FormData): Promise<void> {
   const admin = await requireAdminUser();
-  if (!admin) return;
+  if (!admin) redirect(deleteNoticeUrl(ADMIN_RESOURCES_PATH, "paper", "denied"));
 
-  const resourceId = String(formData.get("resourceId") ?? "");
-  if (!resourceId) return;
+  const resourceId = String(formData.get("resourceId") ?? "").trim();
+  if (!resourceId) redirect(deleteNoticeUrl(ADMIN_RESOURCES_PATH, "paper", "missing"));
 
-  // Only DRAFT resources are deletable — PAID orders reference the rest.
-  await prisma.resource.deleteMany({
-    where: { id: resourceId, status: "DRAFT" },
+  const resource = await prisma.resource.findUnique({
+    where: { id: resourceId },
+    select: { id: true, title: true, slug: true, _count: { select: { entitlements: true } } },
   });
+  if (!resource) redirect(deleteNoticeUrl(ADMIN_RESOURCES_PATH, "paper", "deleted"));
+  if (resource._count.entitlements > 0) {
+    redirect(
+      deleteNoticeUrl(ADMIN_RESOURCES_PATH, "paper", "blocked", {
+        name: resource.title,
+        sold: resource._count.entitlements,
+      }),
+    );
+  }
+
+  // ResourceFile rows cascade; entitlements are zero by the guard above.
+  await prisma.resource.delete({ where: { id: resource.id } });
 
   revalidatePath("/admin/resources");
+  revalidatePath("/admin/bundles");
+  revalidatePath("/browse");
+  revalidatePath("/materials");
+  revalidatePath("/search");
+  revalidatePath("/");
+  if (resource.slug) revalidatePath(`/resources/${resource.slug}`);
+  redirect(
+    deleteNoticeUrl(ADMIN_RESOURCES_PATH, "paper", "deleted", { name: resource.title }),
+  );
+}
+
+/**
+ * Delete a WHOLE bundle with all papers inside it. Bundles that appear on
+ * any order are permanent purchase records and cannot be deleted —
+ * unpublish or archive them instead. Papers inside a deletable bundle are
+ * by definition unsold (per-paper entitlements only come from purchases),
+ * so removing them loses no buyer access.
+ */
+export async function deleteBundleAction(formData: FormData): Promise<void> {
+  const admin = await requireAdminUser();
+  if (!admin) redirect(deleteNoticeUrl(ADMIN_BUNDLES_PATH, "bundle", "denied"));
+
+  const bundleId = String(formData.get("bundleId") ?? "").trim();
+  if (!bundleId) redirect(deleteNoticeUrl(ADMIN_BUNDLES_PATH, "bundle", "missing"));
+
+  const bundle = await prisma.bundle.findUnique({
+    where: { id: bundleId },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      _count: { select: { resources: true, orderItems: true } },
+    },
+  });
+  if (!bundle) redirect(deleteNoticeUrl(ADMIN_BUNDLES_PATH, "bundle", "deleted"));
+  if (bundle._count.orderItems > 0) {
+    redirect(
+      deleteNoticeUrl(ADMIN_BUNDLES_PATH, "bundle", "blocked", {
+        name: bundle.title,
+        sold: bundle._count.orderItems,
+      }),
+    );
+  }
+
+  await prisma.$transaction([
+    prisma.resource.deleteMany({ where: { bundleId: bundle.id } }),
+    prisma.bundle.delete({ where: { id: bundle.id } }),
+  ]);
+
+  revalidatePath("/admin/bundles");
+  revalidatePath("/admin/resources");
+  revalidatePath("/browse");
+  revalidatePath("/");
+  if (bundle.slug) revalidatePath(`/bundles/${bundle.slug}`);
+  redirect(
+    deleteNoticeUrl(ADMIN_BUNDLES_PATH, "bundle", "deleted", {
+      name: bundle.title,
+    }),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────

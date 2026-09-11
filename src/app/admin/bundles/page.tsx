@@ -4,7 +4,9 @@ import { formatPrice } from "@/lib/resources";
 import {
   setBundleStatusAction,
   updateBundlePriceAction,
+  deleteBundleAction,
 } from "@/lib/admin-actions";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +17,18 @@ const statusBadge: Record<string, string> = {
   ARCHIVED: "badge-danger",
 };
 
-export default async function AdminBundlesPage() {
+export default async function AdminBundlesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // Outcome of the last paper/bundle delete attempt (see admin-actions).
+  const sp = await searchParams;
+  const notice = typeof sp.notice === "string" ? sp.notice : undefined;
+  const noticeKind = typeof sp.kind === "string" ? sp.kind : undefined;
+  const noticeName = typeof sp.name === "string" ? sp.name : undefined;
+  const noticeSold = Number(sp.sold ?? 0);
+
   const bundles = await prisma.bundle.findMany({
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     include: {
@@ -30,6 +43,34 @@ export default async function AdminBundlesPage() {
     },
   });
 
+  const noticeBanner =
+    notice === "deleted" ? (
+      <p className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+        {noticeKind === "bundle"
+          ? noticeName
+            ? `Bundle “${noticeName}” and its papers were deleted.`
+            : "Bundle deleted."
+          : noticeName
+            ? `Paper “${noticeName}” was deleted.`
+            : "Paper deleted."}
+      </p>
+    ) : notice === "blocked" ? (
+      <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        Couldn’t delete {noticeName ? `“${noticeName}”` : "it"} — it appears on
+        {" "}
+        {noticeSold} order{noticeSold === 1 ? "" : "s"}. Purchase records are
+        permanent; unpublish or archive instead.
+      </p>
+    ) : notice === "denied" ? (
+      <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        Admin access required.
+      </p>
+    ) : notice === "missing" ? (
+      <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        Nothing was selected for deletion.
+      </p>
+    ) : null;
+
   return (
     <div>
       <h1 className="text-xl font-bold text-neutral-900">Bundles</h1>
@@ -41,6 +82,8 @@ export default async function AdminBundlesPage() {
         </Link>{" "}
         page, then publish the bundle here to put everything on sale.
       </p>
+
+      {noticeBanner}
 
       <div className="card mt-5 md:overflow-x-auto">
         <table className="table-base table-responsive">
@@ -152,9 +195,24 @@ export default async function AdminBundlesPage() {
                     <form action={setBundleStatusAction} className="inline">
                       <input type="hidden" name="bundleId" value={b.id} />
                       <input type="hidden" name="next" value="UNPUBLISHED" />
-                      <button className="btn-secondary btn-sm">Unpublish</button>
+                      <button className="btn-secondary btn-sm mr-1.5">Unpublish</button>
                     </form>
                   )}
+                  <form action={deleteBundleAction} className="inline">
+                    <input type="hidden" name="bundleId" value={b.id} />
+                    <ConfirmSubmit
+                      className="btn-danger btn-sm"
+                      disabled={b._count.orderItems > 0}
+                      title={
+                        b._count.orderItems > 0
+                          ? `Has ${b._count.orderItems} order${b._count.orderItems === 1 ? "" : "s"} — cannot be deleted`
+                          : `Permanently delete “${b.title}” and its ${b._count.resources} paper${b._count.resources === 1 ? "" : "s"}`
+                      }
+                      message={`Delete “${b.title}” and its ${b._count.resources} paper${b._count.resources === 1 ? "" : "s"}? This cannot be undone.`}
+                    >
+                      Delete
+                    </ConfirmSubmit>
+                  </form>
                 </td>
               </tr>
             ))}
@@ -164,9 +222,11 @@ export default async function AdminBundlesPage() {
 
       <p className="mt-3 text-xs text-neutral-500">
         Publishing a bundle also publishes every paper inside it; unpublishing
-        hides the bundle from the catalog while keeping existing owners' access.
+        hides the bundle from the catalog while keeping existing owners&apos; access.
         Papers published later are granted automatically to everyone who already
         bought the bundle — late uploads reach past buyers with no extra steps.
+        Deleting a bundle also deletes its papers, and is only possible while
+        nothing has been sold — purchase records are permanent.
       </p>
     </div>
   );

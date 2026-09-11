@@ -3,7 +3,8 @@ import { prisma } from "@/lib/db";
 import { BundleUploadForm } from "@/components/bundle-upload-form";
 import { FreeMaterialUploadForm } from "@/components/free-material-upload-form";
 import { AdminResourceFilters } from "@/components/admin-resource-filters";
-import { setResourceStatusAction, deleteDraftAction } from "@/lib/admin-actions";
+import { setResourceStatusAction, deleteResourceAction } from "@/lib/admin-actions";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 import { getEnabledProgrammes } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,14 @@ const RESOURCE_STATUSES = ["PUBLISHED", "DRAFT", "UNPUBLISHED", "ARCHIVED"] as c
 export default async function AdminResourcesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; programme?: string; status?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    programme?: string;
+    status?: string;
+    notice?: string;
+    name?: string;
+    sold?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const q = sp.q?.trim() ?? "";
@@ -94,14 +102,41 @@ export default async function AdminResourcesPage({
 
   const isFiltered = Boolean(q || programme || status);
 
+  // Outcome of the last paper/bundle delete attempt (see admin-actions).
+  const notice = typeof sp.notice === "string" ? sp.notice : undefined;
+  const noticeName = typeof sp.name === "string" ? sp.name : undefined;
+  const noticeSold = Number(sp.sold ?? 0);
+
+  const noticeBanner =
+    notice === "deleted" ? (
+      <p className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+        {noticeName ? `Paper “${noticeName}” was deleted.` : "Paper deleted."}
+      </p>
+    ) : notice === "blocked" ? (
+      <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        Couldn’t delete {noticeName ? `“${noticeName}”` : "the paper"} —
+        {noticeSold} student{noticeSold === 1 ? " has" : "s have"} paid access.
+        Buyers keep what they paid for.
+      </p>
+    ) : notice === "denied" ? (
+      <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        Admin access required.
+      </p>
+    ) : notice === "missing" ? (
+      <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        No paper was selected for deletion.
+      </p>
+    ) : null;
+
   return (
     <div>
       <h1 className="text-xl font-bold text-neutral-900">Resources</h1>
       <p className="mt-1 text-sm text-neutral-600">
         Papers live inside bundles — students buy one bundle per course and
-        academic year, so upload PDFs in bulk. Papers stay drafts until the
-        bundle is published.
+        academic year, so upload PDFs in bulk.        Papers stay drafts until the bundle is published.
       </p>
+
+      {noticeBanner}
 
       {/* ── Bulk upload ─────────────────────────────────────────── */}
       <section className="card mt-5 p-5">
@@ -247,12 +282,21 @@ export default async function AdminResourcesPage({
                         <button className="btn-secondary btn-sm mr-1.5">Unpublish</button>
                       </form>
                     )}
-                    {r.status === "DRAFT" && (
-                      <form action={deleteDraftAction} className="inline">
-                        <input type="hidden" name="resourceId" value={r.id} />
-                        <button className="btn-danger btn-sm">Delete</button>
-                      </form>
-                    )}
+                    <form action={deleteResourceAction} className="inline">
+                      <input type="hidden" name="resourceId" value={r.id} />
+                      <ConfirmSubmit
+                        className="btn-danger btn-sm"
+                        disabled={r._count.entitlements > 0}
+                        title={
+                          r._count.entitlements > 0
+                            ? `${r._count.entitlements} student${r._count.entitlements === 1 ? " has" : "s have"} paid access — cannot be deleted`
+                            : `Permanently delete “${r.title}”`
+                        }
+                        message={`Delete “${r.title}”? This cannot be undone.`}
+                      >
+                        Delete
+                      </ConfirmSubmit>
+                    </form>
                   </td>
                 </tr>
               );
