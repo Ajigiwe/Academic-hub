@@ -66,6 +66,14 @@ export async function POST(req: Request) {
 
   const amountPesewas = bundle.pricePesewas;
 
+  // Fail fast on invalid email — Paystack rejects bad addresses at /transaction/initialize.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email)) {
+    return NextResponse.json(
+      { error: "Your email address is invalid. Please update your profile and try again." },
+      { status: 400 },
+    );
+  }
+
   // Unique-reference retry loop.
   let reference: string | null = null;
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -137,9 +145,10 @@ export async function POST(req: Request) {
       data: { status: "CANCELLED" },
     });
     console.error("Payment initiation failed", err);
-    return NextResponse.json(
-      { error: "Could not start the payment. Please try again." },
-      { status: 502 },
-    );
+    const msg =
+      err instanceof Error && err.message.includes("Invalid Email")
+        ? "Your account email is invalid. Please update your profile and try again."
+        : "Could not start the payment. Please try again.";
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 }

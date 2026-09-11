@@ -15,10 +15,14 @@ export function CheckoutButton({ bundleId }: { bundleId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bundleId }),
       });
-      const data = (await res.json()) as {
-        redirectUrl?: string;
-        error?: string;
-      };
+      let data: { redirectUrl?: string; error?: string };
+      try {
+        data = await res.json();
+      } catch {
+        setError("Something went wrong. Please try again.");
+        setPending(false);
+        return;
+      }
       if (data.redirectUrl) {
         window.location.href = data.redirectUrl;
         return;
