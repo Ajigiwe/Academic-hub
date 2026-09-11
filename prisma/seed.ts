@@ -162,6 +162,15 @@ const PROGRAMME_SETTINGS = [
   { key: "programme.secretaryship-and-management.enabled", value: "true" },
 ];
 
+// Everything the seed owns, derived from the manifest above. The prune at
+// the end deletes demo-catalog rows that are NOT in this set, so future
+// seed changes prune stale rows instead of leaving them behind.
+const SEED_BUNDLE_SLUGS = new Set(BUNDLES.map((b) => b.slug));
+const SEED_RESOURCE_SLUGS = new Set(BUNDLES.flatMap((b) => b.papers.map((p) => p.slug)));
+const SEED_COURSE_CODES = new Set(COURSES.map((c) => c.code));
+const SEED_PROGRAMME_SLUGS = new Set(PROGRAMMES.map((p) => p.slug));
+const SEED_SETTING_KEYS = new Set(PROGRAMME_SETTINGS.map((s) => s.key));
+
 async function main() {
   console.log("Seeding…");
 
@@ -195,7 +204,7 @@ async function main() {
   for (const p of PROGRAMMES) {
     await prisma.programme.upsert({
       where: { slug: p.slug },
-      update: {},
+      update: { name: p.name },
       create: p,
     });
   }
@@ -203,7 +212,7 @@ async function main() {
   for (const c of COURSES) {
     await prisma.course.upsert({
       where: { code: c.code },
-      update: {},
+      update: { title: c.title, slug: c.slug },
       create: c,
     });
   }
@@ -211,6 +220,8 @@ async function main() {
   for (const s of PROGRAMME_SETTINGS) {
     await prisma.setting.upsert({
       where: { key: s.key },
+      // Visibility toggles are admin runtime state — a re-seed must not
+      // reset them. Stale setting rows are handled by the prune instead.
       update: {},
       create: s,
     });
@@ -226,24 +237,60 @@ async function main() {
     const courseId = courseByCode.get(b.course);
     if (!programmeId || !courseId) throw new Error(`Missing relation for ${b.slug}`);
 
+    const data = {
+      slug: b.slug,
+      title: b.title,
+      description: b.description,
+      status: "PUBLISHED" as const,
+      level: b.level,
+      academicYear: b.academicYear,
+      pricePesewas: b.pricePesewas,
+      programmeId,
+      courseId,
+    };
+
     const existing = await prisma.bundle.findUnique({ where: { slug: b.slug } });
     if (existing) {
-      console.log(`  bundle exists, skipping: ${b.slug}`);
+      // Keep admin edits (status/price), but restore seed fields that may
+      // have drifted — and add any papers this run of the seed introduces
+      // that the stored bundle is missing.
+      await prisma.bundle.update({ where: { id: existing.id }, data });
+      const existingPapers = await prisma.resource.findMany({
+        where: { bundleId: existing.id },
+        select: { slug: true },
+      });
+      const have = new Set(existingPapers.map((r) => r.slug));
+      const missing = b.papers.filter((p) => !have.has(p.slug));
+      if (missing.length > 0) {
+        await prisma.resource.createMany({
+          data: missing.map((p) => ({
+            slug: p.slug,
+            title: p.title,
+            description: b.description,
+            type: ResourceType.PAST_QUESTION,
+            status: "PUBLISHED",
+            level: b.level,
+            semester: p.semester,
+            academicYear: b.academicYear,
+            pageCount: p.pageCount,
+            previewPages: 2,
+            publishedAt: new Date(),
+            programmeId,
+            courseId,
+            bundleId: existing.id,
+          })),
+        });
+        console.log(`  bundle updated: ${b.slug} (+${missing.length} missing paper${missing.length === 1 ? "" : "s"})`);
+      } else {
+        console.log(`  bundle exists: ${b.slug}`);
+      }
       continue;
     }
 
     await prisma.bundle.create({
       data: {
-        slug: b.slug,
-        title: b.title,
-        description: b.description,
-        status: "PUBLISHED",
-        level: b.level,
-        academicYear: b.academicYear,
-        pricePesewas: b.pricePesewas,
+        ...data,
         publishedAt: new Date(),
-        programmeId,
-        courseId,
         resources: {
           create: b.papers.map((p) => ({
             slug: p.slug,
@@ -266,9 +313,117 @@ async function main() {
     console.log(`  bundle created: ${b.slug} (${b.papers.length} papers)`);
   }
 
+  await pruneStaleRows();
+
   console.log("Seed complete.");
   console.log("  Admin login:   admin@pastq.test / Admin@12345");
   console.log("  Student login: student@pastq.test / Student@123");
+}
+
+/**
+ * Delete demo-catalog rows the seed no longer defines. Refuses to run
+ * against a database with real purchases — rows referenced by orders or
+ * entitlements must never be pruned, and neither is any content an admin
+ * created outside the seed (bundles/papers with unknown slugs, free
+ * materials with no bundle, unknown courses, unknown programmes).
+ *
+ * Every delete is filtered by the manifest, so re-running the seed is
+ * idempotent: upserts converge on the manifest, the prune removes
+ * manifest-orphaned demo rows.
+ */
+async function pruneStaleRows() {
+  const [orders, entitlements] = await Promise.all([
+    prisma.order.count(),
+    prisma.entitlement.count(),
+  ]);
+  if (orders > 0 || entitlements > 0) {
+    console.log(
+      `  prune skipped: ${orders} orders / ${entitlements} entitlements exist (real data)`,
+    );
+    return;
+  }
+
+  // 1. Papers inside seed bundles that the manifest dropped.
+  const stalePapers = await prisma.resource.findMany({
+    where: {
+      bundle: { slug: { in: [...SEED_BUNDLE_SLUGS] } },
+      slug: { notIn: [...SEED_RESOURCE_SLUGS] },
+    },
+    select: { id: true, slug: true },
+  });
+  for (const r of stalePapers) {
+    await prisma.resource.delete({ where: { id: r.id } });
+    console.log(`  pruned stale paper: ${r.slug}`);
+  }
+
+  // 2. Seed bundles removed from the manifest (only while empty — content
+  //    added under them is kept and reported).
+  for (const b of await prisma.bundle.findMany({
+    where: { slug: { notIn: [...SEED_BUNDLE_SLUGS] } },
+    select: { id: true, slug: true, _count: { select: { resources: true, orderItems: true } } },
+  })) {
+    if (b._count.resources > 0 || b._count.orderItems > 0) {
+      console.log(`  kept (has content): bundle ${b.slug}`);
+      continue;
+    }
+    await prisma.bundle.delete({ where: { id: b.id } });
+    console.log(`  pruned stale bundle: ${b.slug}`);
+  }
+
+  // 3. Free materials (bundle-less resources) created by earlier demo
+  //    seeds — identified by the old demo resource slugs, NOT by type.
+  //    Unknown slugs (admin uploads) are never touched. Today the manifest
+  //    defines no free materials, so every legacy demo material slug is
+  //    stale; add future ones to the manifest to keep them.
+  const LEGACY_FREE_MATERIAL_SLUGS = [
+    "ict-201-database-systems-2024-2025-sem1-notes",
+    "ict-205-computer-networks-2024-2025-sem1-slides",
+    "bus-101-introduction-to-business-2024-2025-sem1-revision",
+  ];
+  const staleMaterials = await prisma.resource.deleteMany({
+    where: { bundleId: null, slug: { in: LEGACY_FREE_MATERIAL_SLUGS } },
+  });
+  if (staleMaterials.count > 0) {
+    console.log(`  pruned ${staleMaterials.count} stale free material(s)`);
+  }
+
+  // 4. Courses with no catalogue content that the manifest dropped.
+  for (const c of await prisma.course.findMany({
+    where: { code: { notIn: [...SEED_COURSE_CODES] } },
+    select: { id: true, code: true, _count: { select: { bundles: true, resources: true } } },
+  })) {
+    if (c._count.bundles > 0 || c._count.resources > 0) {
+      console.log(`  kept (has content): course ${c.code}`);
+      continue;
+    }
+    await prisma.course.delete({ where: { id: c.id } });
+    console.log(`  pruned stale course: ${c.code}`);
+  }
+
+  // 5. Programmes with no catalogue content that the manifest dropped.
+  for (const p of await prisma.programme.findMany({
+    where: { slug: { notIn: [...SEED_PROGRAMME_SLUGS] } },
+    select: { id: true, slug: true, _count: { select: { bundles: true, resources: true } } },
+  })) {
+    if (p._count.bundles > 0 || p._count.resources > 0) {
+      console.log(`  kept (has content): programme ${p.slug}`);
+      continue;
+    }
+    await prisma.programme.delete({ where: { id: p.id } });
+    await prisma.setting.deleteMany({ where: { key: `programme.${p.slug}.enabled` } });
+    console.log(`  pruned stale programme: ${p.slug}`);
+  }
+
+  // 6. Visibility settings for slugs the seed no longer defines.
+  const staleSettings = await prisma.setting.deleteMany({
+    where: {
+      key: { startsWith: "programme." },
+      NOT: { key: { in: [...SEED_SETTING_KEYS] } },
+    },
+  });
+  if (staleSettings.count > 0) {
+    console.log(`  pruned ${staleSettings.count} stale programme setting(s)`);
+  }
 }
 
 main()
