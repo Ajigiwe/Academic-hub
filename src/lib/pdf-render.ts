@@ -63,8 +63,6 @@ async function loadDocument(data: Uint8Array) {
     disableFontFace: true,
     standardFontDataUrl: pdfjs.GlobalWorkerOptions.standardFontDataUrl,
     password: "",
-    // Limit image decoding to avoid crashes on corrupt/unusual streams.
-    maxImageSize: 1024 * 1024,
     // cMap + standardFontData for CJK / legacy fonts.
     cMapUrl: pdfjs.GlobalWorkerOptions.standardFontDataUrl,
     cMapPacked: true,
