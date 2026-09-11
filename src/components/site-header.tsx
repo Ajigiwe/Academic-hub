@@ -80,6 +80,7 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
             users need their own log-out affordance here. */}
         {user ? (
           <div className="flex items-center gap-2 md:hidden">
+            <ThemeToggle />
             <Link
               href="/account"
               aria-label="My account"
@@ -90,9 +91,12 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
             <LogoutButton />
           </div>
         ) : (
-          <Link href="/login" className="btn-primary btn-sm md:hidden">
-            Log in
-          </Link>
+          <div className="flex items-center gap-2 md:hidden">
+            <ThemeToggle />
+            <Link href="/login" className="btn-primary btn-sm">
+              Log in
+            </Link>
+          </div>
         )}
       </div>
     </header>
