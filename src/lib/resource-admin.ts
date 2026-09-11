@@ -56,6 +56,7 @@ export const bundleFormSchema = z.object({
     .trim()
     .min(2, "Programme is required (e.g. BSc IT).")
     .max(120, "Programme must be at most 120 characters."),
+  solved: z.coerce.boolean().default(false),
 });
 
 export type BundleFormInput = z.infer<typeof bundleFormSchema>;
@@ -464,6 +465,7 @@ export async function uploadResourceFiles(input: {
         slug,
         title: fields.title,
         description: fields.description ?? null,
+        solved: fields.solved ?? false,
         status: "DRAFT",
         level: fields.level,
         academicYear: fields.academicYear,

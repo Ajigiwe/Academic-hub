@@ -152,6 +152,7 @@ const BUNDLE_FIELDS = {
   courseCode: "ICT 201",
   courseTitle: "Database Systems",
   programmeName: "BSc Information Technology",
+  solved: false,
 };
 
 /** Unique human-readable reference, same shape as the orders API. */

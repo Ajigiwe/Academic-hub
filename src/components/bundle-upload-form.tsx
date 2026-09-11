@@ -258,6 +258,21 @@ export function BundleUploadForm({
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
+
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="solved"
+                value="true"
+                className="h-4 w-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
+              />
+              <span className="text-sm font-medium text-neutral-700">Includes solutions</span>
+            </label>
+            <p className="text-xs text-neutral-500">
+              Check if this bundle contains worked solutions alongside the past questions.
+            </p>
+          </div>
         </div>
       )}
 

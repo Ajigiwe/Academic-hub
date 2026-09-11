@@ -55,6 +55,7 @@ async function main() {
       courseCode: "TST 999",
       courseTitle: "Smoke Test Course",
       programmeName: "BSc Smoke Testing",
+      solved: false,
     },
   });
   console.log("created:", created);
@@ -137,6 +138,7 @@ async function main() {
         courseCode: "TST 998",
         courseTitle: "Reject Course",
         programmeName: "BSc Smoke Testing",
+        solved: false,
       },
     });
   } catch (err) {

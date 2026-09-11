@@ -98,6 +98,9 @@ export default async function BundleDetailPage({
               <span className="badge-brand font-semibold">{bundle.course.code}</span>
               <span className="badge-neutral">Level {bundle.level}</span>
               <span className="badge-neutral">{bundle.academicYear}</span>
+              {bundle.solved && (
+                <span className="badge-success font-semibold">Solved</span>
+              )}
               {semesters.length > 0 && (
                 <span className="badge-neutral">
                   {semesters.map((s) => (s === 2 ? "Second" : "First") + " Semester").join(" & ")}

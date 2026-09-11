@@ -108,6 +108,7 @@ model Bundle {
   slug          String         @unique // "ict-201-database-systems-2024-2025"
   title         String // "ICT 201 — Database Systems · 2024/2025 Past Questions"
   description   String?
+  solved        Boolean        @default(false) // includes worked solutions
   status        ResourceStatus @default(DRAFT)
   level         Int // 100, 200, 300, 400…
   academicYear  String         @map("academic_year") // "2024/2025"

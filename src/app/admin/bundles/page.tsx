@@ -122,6 +122,7 @@ export default async function AdminBundlesPage({
                     </Link>
                     <p className="text-xs text-neutral-500">
                       {b.programme.name} · Level {b.level} · {b.academicYear}
+                      {b.solved && <span className="ml-1 text-green-600 font-semibold">· Solved</span>}
                     </p>
                   </div>
                 </td>

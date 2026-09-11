@@ -33,6 +33,7 @@ export function DocumentViewer({
   const total = Math.max(1, pageCount);
   const [page, setPage] = useState(1);
   const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0); // 0, 90, 180, 270
   const [error, setError] = useState<ViewerError>(null);
   const [jumpOpen, setJumpOpen] = useState(false);
 
@@ -503,6 +504,18 @@ export function DocumentViewer({
             </svg>
           </button>
 
+          <button
+            className="btn-ghost btn-sm"
+            onClick={() => setRotation((r) => (r + 90) % 360)}
+            aria-label="Rotate page"
+            title="Rotate page"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+            </svg>
+          </button>
+
           <button className="btn-ghost btn-sm" onClick={goFullscreen} aria-label="Fullscreen">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M8 3H5a2 2 0 0 0-2 2v3" />
@@ -538,7 +551,7 @@ export function DocumentViewer({
         <div className="flex h-full items-start justify-center overflow-auto p-4">
           <div
             className="mx-auto w-full max-w-2xl origin-top transition-transform duration-200 ease-out"
-            style={{ transform: `scale(${displayZoom})` }}
+            style={{ transform: `scale(${displayZoom}) rotate(${rotation}deg)` }}
           >
             <div className="relative overflow-hidden rounded-lg border border-neutral-300 bg-white shadow-card">
               {url ? (

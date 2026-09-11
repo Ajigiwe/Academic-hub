@@ -42,6 +42,7 @@ async function main() {
       courseCode: "ICT 201",
       courseTitle: "Database Systems",
       programmeName: "BSc Information Technology",
+      solved: false,
     },
   });
   console.log("draft bundle ready:", result);

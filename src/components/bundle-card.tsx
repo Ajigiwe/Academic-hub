@@ -8,6 +8,7 @@ type CardBundle = Pick<
 > & {
   course: { code: string; title: string } | null;
   programme: { name: string } | null;
+  solved?: boolean;
   _count: { resources: number };
 };
 
@@ -27,6 +28,9 @@ export function BundleCard({ bundle }: { bundle: CardBundle }) {
         </span>
         <span className="badge-neutral">Level {bundle.level}</span>
         <span className="badge-neutral">{bundle.academicYear}</span>
+        {bundle.solved && (
+          <span className="badge-success font-semibold">Solved</span>
+        )}
       </div>
 
       <Link

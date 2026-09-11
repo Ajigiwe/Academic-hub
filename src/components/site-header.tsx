@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { SessionUser } from "@/lib/auth";
 import { LogoutButton } from "./logout-button";
 import { Logo } from "./logo";
+import { ThemeToggle } from "./theme-toggle";
 
 const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "Academic Resource Hub";
 
@@ -18,7 +19,7 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
     // Admin renders its own console chrome (dark rail + mobile app bar) —
     // the public site header is hidden there entirely.
     <header
-      className={`sticky top-0 z-40 border-b border-neutral-200/80 bg-white/90 backdrop-blur-md ${
+      className={`sticky top-0 z-40 border-b border-neutral-200/80 bg-white/90 backdrop-blur-md dark:border-neutral-800/80 dark:bg-neutral-950/90 ${
         inAdmin ? "hidden" : ""
       }`}
     >
@@ -48,6 +49,7 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
         </nav>
 
         <div className="hidden items-center gap-2.5 md:flex">
+          <ThemeToggle />
           {user ? (
             <>
               <Link

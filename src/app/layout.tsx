@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     template: `%s · ${appName}`,
   },
   description:
-    "Ghana's digital academic library. Find, purchase, and study past questions and academic resources — Learn · Revise · Excel.",
+    "Ghana's digital academic library. Find solved and unsolved past questions, course materials, slides, and notes — everything you need to study smarter.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -51,7 +51,14 @@ export default async function RootLayout({
   const user = await getCurrentUser();
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('arh-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.classList.add('dark')}catch(e){}`,
+          }}
+        />
+      </head>
       <body className={`${fraunces.variable} flex min-h-screen flex-col`}>
         <RegisterServiceWorker />
         <SiteHeader user={user} />

@@ -24,8 +24,9 @@ export default function HomePage() {
               </span>
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-base text-neutral-600 sm:text-lg">
-              Past questions for your course and year, plus free slides and
-              notes — tell us what you came for and we'll take you there.
+              Solved &amp; unsolved past questions for your course and year, plus
+              free slides and notes — tell us what you came for and we&apos;ll
+              take you there.
             </p>
 
             {/* Two doors: the visitor picks their intent immediately */}
@@ -49,7 +50,7 @@ export default function HomePage() {
                   Past questions
                 </p>
                 <p className="relative mt-1 text-sm text-neutral-600">
-                  Exam papers by course & year — for sale.
+                  Solved &amp; unsolved papers by course &amp; year — for sale.
                 </p>
                 <span className="relative mt-5 flex items-center justify-between">
                   <span className="badge-brand font-semibold">For sale</span>
