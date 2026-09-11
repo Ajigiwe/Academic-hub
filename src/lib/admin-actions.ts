@@ -620,6 +620,63 @@ export async function addProgrammeAction(formData: FormData): Promise<void> {
 }
 
 /**
+ * Rename a programme track. Updates the name and regenerates the slug.
+ * If the slug changes, the old setting key is migrated to the new one.
+ */
+export async function editProgrammeAction(formData: FormData): Promise<void> {
+  const admin = await requireAdminUser();
+  if (!admin) redirect("/admin/settings?notice=denied");
+
+  const oldSlug = String(formData.get("slug") ?? "").trim();
+  const newName = String(formData.get("name") ?? "").trim();
+  if (!oldSlug || newName.length < 2 || newName.length > 120) {
+    redirect("/admin/settings?notice=missing");
+  }
+
+  const programme = await prisma.programme.findUnique({
+    where: { slug: oldSlug },
+    select: { id: true, name: true },
+  });
+  if (!programme) redirect("/admin/settings?notice=deleted");
+
+  const newSlug = slugify(newName);
+  if (!newSlug) redirect("/admin/settings?notice=missing");
+
+  // Nothing to do if the name didn't change
+  if (programme.name === newName && oldSlug === newSlug) {
+    redirect("/admin/settings?notice=updated");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // If the slug changed, migrate the setting key
+    if (oldSlug !== newSlug) {
+      const oldKey = programmeSettingKey(oldSlug);
+      const newKey = programmeSettingKey(newSlug);
+      const existing = await tx.setting.findUnique({ where: { key: oldKey } });
+      await tx.setting.deleteMany({ where: { key: oldKey } });
+      await tx.setting.upsert({
+        where: { key: newKey },
+        update: { value: existing?.value ?? "true" },
+        create: { key: newKey, value: existing?.value ?? "true" },
+      });
+    }
+    await tx.programme.update({
+      where: { id: programme.id },
+      data: { name: newName, slug: newSlug },
+    });
+  });
+
+  revalidatePath("/admin/settings");
+  revalidatePath("/");
+  revalidatePath("/courses");
+  revalidatePath("/materials");
+  revalidatePath("/search");
+  redirect(
+    `/admin/settings?notice=updated&name=${encodeURIComponent(newName)}`,
+  );
+}
+
+/**
  * Delete a programme track. Only allowed when it has no bundles or
  * resources attached — hiding content is what the visibility toggle is
  * for. Always ends with a redirect back to the settings page carrying a

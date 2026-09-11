@@ -5,6 +5,7 @@ import {
   addProgrammeAction,
   deleteProgrammeAction,
 } from "@/lib/admin-actions";
+import { EditProgrammeModal } from "@/components/edit-programme-modal";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,12 @@ export default async function AdminSettingsPage({
     ) : notice === "missing" ? (
       <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
         No programme was selected for deletion.
+      </p>
+    ) : notice === "updated" ? (
+      <p className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+        {noticeName
+          ? `Programme "${noticeName}" was updated.`
+          : "Programme updated."}
       </p>
     ) : null;
 
@@ -177,21 +184,24 @@ export default async function AdminSettingsPage({
                         : `${count.bundles} bundle${count.bundles === 1 ? "" : "s"} · ${count.materials} paper${count.materials === 1 ? "" : "s"} attached`}
                     </p>
                   </div>
-                  <form action={deleteProgrammeAction} className="shrink-0">
-                    <input type="hidden" name="slug" value={p.slug} />
-                    <button
-                      type="submit"
-                      className="btn-danger btn-sm"
-                      disabled={!deletable}
-                      title={
-                        deletable
-                          ? `Delete ${p.name} permanently`
-                          : `${p.name} still has content — unpublish or move it first`
-                      }
-                    >
-                      Delete
-                    </button>
-                  </form>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <EditProgrammeModal slug={p.slug} currentName={p.name} />
+                    <form action={deleteProgrammeAction} className="inline">
+                      <input type="hidden" name="slug" value={p.slug} />
+                      <button
+                        type="submit"
+                        className="btn-danger btn-sm"
+                        disabled={!deletable}
+                        title={
+                          deletable
+                            ? `Delete ${p.name} permanently`
+                            : `${p.name} still has content — unpublish or move it first`
+                        }
+                      >
+                        Delete
+                      </button>
+                    </form>
+                  </div>
                 </div>
               );
             })}
