@@ -134,13 +134,31 @@
   .reader-bar button:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
   .reader-bar button.primary:hover:not(:disabled) { background: var(--navy); border-color: var(--navy); color: #fff; }
 
+  .zoom-bar {
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    padding: 6px 0; margin-bottom: 8px;
+  }
+  .zoom-bar button {
+    border: 1px solid var(--line); background: #fff; color: var(--text);
+    font-size: 13px; font-weight: 600; padding: 5px 10px; border-radius: 7px;
+    cursor: pointer;
+  }
+  .zoom-bar button:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
+  .zoom-bar .zoom-val {
+    font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted);
+    min-width: 40px; text-align: center; cursor: pointer;
+  }
+  .zoom-bar .zoom-val:hover { color: var(--blue); }
+
   .page-shell {
     background: #fff; border: 1px solid var(--line); border-radius: 14px;
     padding: 14px; box-shadow: 0 1px 3px rgb(15 23 42 / .06);
+    overflow: hidden;
   }
   .page-shell img {
     display: block; width: 100%; height: auto; border-radius: 6px;
-    background: #fff;
+    background: #fff; transition: transform 0.2s ease-out;
+    transform-origin: top center;
   }
   .page-nav {
     display: flex; align-items: center; justify-content: center; gap: 12px;
@@ -233,11 +251,16 @@
 
   <section id="reader">
     <div class="reader-bar">
-      <button id="backBtn">← Back to list</button>
+      <button id="backBtn">← Back</button>
       <div class="r-title" id="rTitle"></div>
       <button class="primary" id="webBtn" hidden>Open online ↗</button>
     </div>
-    <div class="page-shell">
+    <div class="zoom-bar">
+      <button id="zoomOut" aria-label="Zoom out">−</button>
+      <span class="zoom-val" id="zoomVal" title="Reset zoom">100%</span>
+      <button id="zoomIn" aria-label="Zoom in">+</button>
+    </div>
+    <div class="page-shell" id="pageShell">
       <div class="loading-note" id="pageLoading">Loading page…</div>
       <img id="pageImg" alt="Saved paper page" hidden>
     </div>
@@ -417,6 +440,7 @@
     listEl.hidden = true;
     emptyEl.hidden = true;
     readerEl.classList.add("active");
+    applyZoom(1);
     showPage(1, true);
   }
 
@@ -443,7 +467,65 @@
     if (e.key === "ArrowRight" || e.key === "PageDown") showPage(currentPage + 1, true);
     else if (e.key === "ArrowLeft" || e.key === "PageUp") showPage(currentPage - 1, true);
     else if (e.key === "Escape") closePaper();
+    else if (e.key === "+" || e.key === "=") applyZoom(currentZoom + 0.25);
+    else if (e.key === "-") applyZoom(currentZoom - 0.25);
+    else if (e.key === "0") applyZoom(1);
   });
+
+  // ── Zoom controls ────────────────────────────────────────────────
+  var currentZoom = 1;
+  var pageImg = document.getElementById("pageImg");
+  var pageShell = document.getElementById("pageShell");
+  var zoomValEl = document.getElementById("zoomVal");
+
+  function applyZoom(z) {
+    currentZoom = Math.min(3, Math.max(0.5, z));
+    pageImg.style.transform = "scale(" + currentZoom + ")";
+    pageImg.style.transformOrigin = "top center";
+    zoomValEl.textContent = Math.round(currentZoom * 100) + "%";
+  }
+
+  document.getElementById("zoomIn").addEventListener("click", function () {
+    applyZoom(currentZoom + 0.25);
+  });
+  document.getElementById("zoomOut").addEventListener("click", function () {
+    applyZoom(currentZoom - 0.25);
+  });
+  zoomValEl.addEventListener("click", function () {
+    applyZoom(1);
+  });
+
+  // Ctrl/Cmd + scroll wheel zoom
+  pageShell.addEventListener("wheel", function (e) {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    var delta = e.deltaY > 0 ? -0.15 : 0.15;
+    applyZoom(currentZoom + delta);
+  }, { passive: false });
+
+  // Pinch-to-zoom
+  var pinchStart = 0;
+  var pinchZoomStart = 1;
+  pageShell.addEventListener("touchstart", function (e) {
+    if (e.touches.length === 2) {
+      pinchStart = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      pinchZoomStart = currentZoom;
+    }
+  }, { passive: true });
+  pageShell.addEventListener("touchmove", function (e) {
+    if (e.touches.length === 2 && pinchStart > 0) {
+      e.preventDefault();
+      var dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      applyZoom(pinchZoomStart * (dist / pinchStart));
+    }
+  }, { passive: false });
+  pageShell.addEventListener("touchend", function () { pinchStart = 0; }, { passive: true });
 
   // ── Leak deterrence (parity with the online viewer) ──────────
   // A page cannot truly block OS-level screenshots; every cached page

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   cachePageImage,
   isSavedOffline,
@@ -20,22 +20,10 @@ type ViewerError = {
   message: string;
 } | null;
 
-type ReadMode = "single" | "continuous";
-
-const MODE_STORAGE_KEY = "arh-viewer-mode";
-/** Pages kept decoded around the current one (continuous mode). */
-const LOAD_WINDOW = 2;
-/** Pages kept alive beyond the load window before their blob is revoked. */
-const KEEP_EXTRA = 2;
-
 /**
- * Secure document reader (spec §13/§15). Pages are rendered server-side
- * with the user's identity burned into the pixels; this component only
- * displays authorized page images and never touches the PDF.
- *
- * Reading modes: single page (prev/next) and continuous scroll with a
- * lazy load window — only pages near the viewport are rendered and kept
- * in memory; everything else is a lightweight placeholder.
+ * Secure document reader — one page per view. Pages are rendered
+ * server-side with the user's identity burned into the pixels; this
+ * component only displays authorized page images and never touches the PDF.
  */
 export function DocumentViewer({
   slug,
@@ -43,29 +31,21 @@ export function DocumentViewer({
   pageCount,
 }: DocumentViewerProps) {
   const total = Math.max(1, pageCount);
-
-  const [mode, setMode] = useState<ReadMode>("single");
-  const [page, setPage] = useState(1); // single-page mode cursor
-  const [scrollPage, setScrollPage] = useState(1); // continuous-mode cursor
+  const [page, setPage] = useState(1);
   const [zoom, setZoom] = useState(1);
   const [error, setError] = useState<ViewerError>(null);
   const [jumpOpen, setJumpOpen] = useState(false);
 
-  // page image state (blob URLs), per page
   const [pageUrls, setPageUrls] = useState<Map<number, string>>(new Map());
   const [loadingPages, setLoadingPages] = useState<Set<number>>(new Set());
   const [pageErrors, setPageErrors] = useState<Map<number, string>>(new Map());
 
   const rootRef = useRef<HTMLDivElement>(null);
-  const shellRef = useRef<HTMLDivElement>(null);
-  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const pendingScrollTarget = useRef<number | null>(null);
+  const imgContainerRef = useRef<HTMLDivElement>(null);
 
-  const displayPage = mode === "single" ? page : scrollPage;
-  const progress = total > 1 ? (displayPage - 1) / (total - 1) : 1;
+  const progress = total > 1 ? (page - 1) / (total - 1) : 1;
 
-  // ── Viewing session bootstrap (single-flight; React strict mode
-  //    mounts effects twice in dev, which would race page loads) ────
+  // ── Viewing session bootstrap ─────────────────────────────────────
   const sessionPromise = useRef<Promise<void> | null>(null);
 
   const ensureSession = useCallback(() => {
@@ -83,7 +63,7 @@ export function DocumentViewer({
         }
       })().catch(() => {
         setError({ kind: "network", message: "Network error starting the viewer." });
-        sessionPromise.current = null; // allow a real retry next time
+        sessionPromise.current = null;
       });
     }
     return sessionPromise.current;
@@ -93,21 +73,16 @@ export function DocumentViewer({
     void ensureSession();
   }, [ensureSession]);
 
-  // ── Page loading: mint token → fetch image → blob URL ────────────
-  // Deduped and memoized per page; lives outside state so parallel
-  // callers share one request.
+  // ── Page loading ──────────────────────────────────────────────────
   const pageRequests = useRef<Map<number, Promise<string>>>(new Map());
 
-  /** Fetches one watermarked page image (token mint + GET). */
   const fetchPageResponse = useCallback(
     async (pageNumber: number): Promise<Response> => {
-      // Mint a page token, restarting the session once if the 10-min window lapsed.
       const mint = async (): Promise<string> => {
         const tokenRes = await fetch(`/api/viewer/${slug}/pages/${pageNumber}`, {
           method: "POST",
         });
         if (tokenRes.status === 428) {
-          // Session window lapsed — restart once and redo the mint.
           sessionPromise.current = null;
           await ensureSession();
           const retry = await fetch(`/api/viewer/${slug}/pages/${pageNumber}`, {
@@ -174,7 +149,6 @@ export function DocumentViewer({
       });
 
       pageRequests.current.set(pageNumber, promise);
-      // On failure, drop the memo so a retry can run again.
       promise.catch(() => pageRequests.current.delete(pageNumber));
       return promise;
     },
@@ -189,16 +163,21 @@ export function DocumentViewer({
     [getPageUrl],
   );
 
-  // ── Save for offline (PWA) ───────────────────────────────────────
+  // ── Load current page + prefetch neighbours ───────────────────────
+  useEffect(() => {
+    if (error?.kind === "denied" || error?.kind === "missing") return;
+    void getPageUrl(page).catch(() => undefined);
+    // Prefetch adjacent pages for snappy navigation
+    if (page > 1) void getPageUrl(page - 1).catch(() => undefined);
+    if (page < total) void getPageUrl(page + 1).catch(() => undefined);
+  }, [page, total, getPageUrl, error]);
+
+  // ── Save for offline ──────────────────────────────────────────────
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [saveProgress, setSaveProgress] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
-  // caches API is browser-only; gate rendering behind mount to avoid SSR
-  // hydration mismatch (server sees offlineSupported() === false).
   const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (!offlineSupported()) return;
@@ -206,9 +185,7 @@ export function DocumentViewer({
     void isSavedOffline(slug).then((saved) => {
       if (!cancelled && saved) setSaveState("saved");
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [slug]);
 
   async function saveForOffline() {
@@ -224,183 +201,106 @@ export function DocumentViewer({
         }
         setSaveProgress(n);
       }
-      await writeOfflineMeta({
-        slug,
-        title,
-        pageCount: total,
-        savedAt: new Date().toISOString(),
-      });
+      await writeOfflineMeta({ slug, title, pageCount: total, savedAt: new Date().toISOString() });
       setSaveState("saved");
     } catch {
       setSaveState("idle");
-      setSaveError(
-        "Could not finish saving this paper for offline. Check your connection and try again.",
-      );
+      setSaveError("Could not finish saving. Check your connection and try again.");
     }
   }
 
-  // ── Mode handling ────────────────────────────────────────────────
-  // Restore persisted mode after mount (avoids SSR markup mismatch).
-  useEffect(() => {
-    const stored = window.localStorage.getItem(MODE_STORAGE_KEY);
-    if (stored === "continuous") setMode("continuous");
+  // ── Zoom ──────────────────────────────────────────────────────────
+  const [displayZoom, setDisplayZoom] = useState(1);
+  const zoomTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const applyZoom = useCallback((next: number) => {
+    const clamped = Math.min(3, Math.max(0.5, next));
+    setDisplayZoom(+clamped.toFixed(2));
   }, []);
 
-  const switchMode = useCallback(
-    (next: ReadMode) => {
-      setMode((prev) => {
-        if (prev === next) return prev;
-        if (prev === "continuous") {
-          // leaving continuous: land the single-page cursor on the
-          // page the reader is actually looking at
-          setPage(scrollPage);
-        } else {
-          // entering continuous: scroll to the current single page
-          pendingScrollTarget.current = page;
-        }
-        window.localStorage.setItem(MODE_STORAGE_KEY, next);
-        return next;
-      });
-    },
-    [page, scrollPage],
-  );
+  const zoomIn = useCallback(() => applyZoom(displayZoom + 0.25), [displayZoom, applyZoom]);
+  const zoomOut = useCallback(() => applyZoom(displayZoom - 0.25), [displayZoom, applyZoom]);
+  const resetZoom = useCallback(() => applyZoom(1), [applyZoom]);
 
-  // ── Continuous mode: scroll spy + lazy window ────────────────────
-  const ensureWindowLoaded = useCallback(
-    (center: number) => {
-      for (let p = center - LOAD_WINDOW; p <= center + LOAD_WINDOW; p++) {
-        if (p >= 1 && p <= total && !pageUrls.has(p)) {
-          void getPageUrl(p).catch(() => undefined); // per-page error shown inline
-        }
-      }
-    },
-    [getPageUrl, pageUrls, total],
-  );
+  // Sync zoom state
+  useEffect(() => { setZoom(displayZoom); }, [displayZoom]);
 
-  const evictDistant = useCallback((center: number) => {
-    setPageUrls((prev) => {
-      let changed = false;
-      const next = new Map(prev);
-      for (const p of next.keys()) {
-        if (Math.abs(p - center) > LOAD_WINDOW + KEEP_EXTRA) {
-          URL.revokeObjectURL(next.get(p)!);
-          pageRequests.current.delete(p);
-          next.delete(p);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, []);
-
+  // Wheel-to-zoom (Ctrl/Cmd + scroll)
   useEffect(() => {
-    if (mode !== "continuous") return;
-    const el = shellRef.current;
+    const el = imgContainerRef.current;
     if (!el) return;
-
-    let ticking = false;
-    const update = () => {
-      ticking = false;
-      const rect = el.getBoundingClientRect();
-      const center = rect.top + rect.height / 2;
-
-      let current = 1;
-      for (let i = 0; i < total; i++) {
-        const node = pageRefs.current[i];
-        if (!node) continue;
-        const r = node.getBoundingClientRect();
-        if (r.top <= center && r.bottom >= center) {
-          current = i + 1;
-          break;
-        }
-        if (r.top > center) {
-          current = i === 0 ? 1 : i; // first not-yet-reached page
-          break;
-        }
-      }
-
-      setScrollPage((prev) => (prev === current ? prev : current));
-      ensureWindowLoaded(current);
-      evictDistant(current);
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.15 : 0.15;
+      applyZoom(displayZoom + delta);
     };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [displayZoom, applyZoom]);
 
-    const onScroll = () => {
-      if (!ticking) {
-        ticking = true;
-        requestAnimationFrame(update);
+  // Pinch-to-zoom
+  useEffect(() => {
+    const el = imgContainerRef.current;
+    if (!el) return;
+    let startDist = 0;
+    let startZoom = 1;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        startDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY,
+        );
+        startZoom = displayZoom;
       }
     };
-
-    el.addEventListener("scroll", onScroll, { passive: true });
-    update(); // initial window
-    return () => el.removeEventListener("scroll", onScroll);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, total, ensureWindowLoaded, evictDistant]);
-
-  // Scroll to the pending target after entering continuous mode.
-  useLayoutEffect(() => {
-    if (mode !== "continuous") return;
-    const target = pendingScrollTarget.current;
-    if (target == null) return;
-    pendingScrollTarget.current = null;
-    const node = pageRefs.current[target - 1];
-    const el = shellRef.current;
-    if (node && el) {
-      el.scrollTo({ top: node.offsetTop - 12, behavior: "auto" });
-    }
-  }, [mode]);
-
-  // Reveal the window for the initial page when placeholders mount.
-  useEffect(() => {
-    if (mode === "continuous") ensureWindowLoaded(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
-
-  // ── Single-page mode loading ─────────────────────────────────────
-  useEffect(() => {
-    if (mode !== "single") return;
-    if (error?.kind === "denied" || error?.kind === "missing") return;
-    void getPageUrl(page).catch(() => undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, mode]);
-
-  // Revoke every blob URL on unmount.
-  useEffect(() => {
-    const requests = pageRequests;
-    const urls = pageUrls;
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && startDist > 0) {
+        e.preventDefault();
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY,
+        );
+        applyZoom(startZoom * (dist / startDist));
+      }
+    };
+    const onTouchEnd = () => { startDist = 0; };
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
     return () => {
-      requests.current.clear();
-      for (const url of urls.values()) URL.revokeObjectURL(url);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayZoom, applyZoom]);
+
+  // Cleanup zoom timer
+  useEffect(() => {
+    return () => { if (zoomTimer.current) clearTimeout(zoomTimer.current); };
   }, []);
 
   // ── Keyboard navigation ──────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (jumpOpen && e.key === "Escape") {
-        setJumpOpen(false);
-        return;
-      }
+      if (jumpOpen && e.key === "Escape") { setJumpOpen(false); return; }
       if (e.key === "ArrowRight" || e.key === "PageDown") {
-        if (mode === "single") setPage((p) => Math.min(total, p + 1));
-        else scrollToPage(Math.min(total, scrollPage + 1));
+        setPage((p) => Math.min(total, p + 1));
       } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
-        if (mode === "single") setPage((p) => Math.max(1, p - 1));
-        else scrollToPage(Math.max(1, scrollPage - 1));
+        setPage((p) => Math.max(1, p - 1));
+      } else if (e.key === "+" || e.key === "=") {
+        applyZoom(displayZoom + 0.25);
+      } else if (e.key === "-") {
+        applyZoom(displayZoom - 0.25);
+      } else if (e.key === "0") {
+        applyZoom(1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [total, mode, scrollPage, jumpOpen]);
+  }, [total, jumpOpen, displayZoom, applyZoom]);
 
-  // ── Screenshot & leak deterrence ───────────────────────────────
-  // A web page cannot truly prevent OS-level captures (spec §14/§15) —
-  // the burned-in watermark remains the traceability mechanism. These
-  // layers deter casual capture: pages hide whenever the tab loses
-  // visibility or focus, capture hotkeys trigger an instant blackout,
-  // and print/save attempts yield only a notice.
+  // ── Screenshot & leak deterrence ──────────────────────────────────
   const [shielded, setShielded] = useState(false);
   const [deterrenceNote, setDeterrenceNote] = useState<string | null>(null);
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -427,7 +327,6 @@ export function DocumentViewer({
     const onKeyDown = (e: KeyboardEvent) => {
       if (!isCaptureKey(e)) return;
       shield();
-      // Best-effort: overwrite the clipboard copy Windows makes on key-up.
       void navigator.clipboard
         ?.writeText("Screenshots are disabled — pages are watermarked to the reader's account.")
         .catch(() => undefined);
@@ -447,7 +346,7 @@ export function DocumentViewer({
     };
   }, [flashNote]);
 
-  // Block the browser's save/print shortcuts (Ctrl/Cmd+S, Ctrl/Cmd+P).
+  // Block Ctrl/Cmd+S and Ctrl/Cmd+P
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
@@ -465,61 +364,6 @@ export function DocumentViewer({
     return () => document.removeEventListener("keydown", onKey);
   }, [flashNote]);
 
-  const scrollToPage = useCallback(
-    (target: number) => {
-      const node = pageRefs.current[target - 1];
-      const el = shellRef.current;
-      if (node && el) {
-        el.scrollTo({ top: node.offsetTop - 12, behavior: "smooth" });
-      }
-      setScrollPage(target);
-    },
-    [],
-  );
-
-  // ── Pinch to zoom ────────────────────────────────────────────────
-  const zoomRef = useRef(zoom);
-  useEffect(() => {
-    zoomRef.current = zoom;
-  }, [zoom]);
-
-  useEffect(() => {
-    const el = shellRef.current;
-    if (!el) return;
-    let startDist = 0;
-    let startZoom = 1;
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        startDist = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY,
-        );
-        startZoom = zoomRef.current;
-      }
-    };
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2 && startDist > 0) {
-        const dist = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY,
-        );
-        const next = Math.min(3, Math.max(0.6, startZoom * (dist / startDist)));
-        setZoom(+next.toFixed(2));
-      }
-    };
-    const onTouchEnd = () => {
-      startDist = 0;
-    };
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: true });
-    el.addEventListener("touchend", onTouchEnd);
-    return () => {
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
-      el.removeEventListener("touchend", onTouchEnd);
-    };
-  }, []);
-
   const goFullscreen = useCallback(() => {
     const el = rootRef.current;
     if (!el) return;
@@ -527,7 +371,45 @@ export function DocumentViewer({
     else void el.requestFullscreen?.().catch(() => undefined);
   }, []);
 
-  // ── Error screen (global failures) ───────────────────────────────
+  // ── Swipe navigation (single finger, horizontal) ─────────────────
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    const el = imgContainerRef.current;
+    if (!el) return;
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (!touchStart.current || e.changedTouches.length !== 1) return;
+      const dx = e.changedTouches[0].clientX - touchStart.current.x;
+      const dy = e.changedTouches[0].clientY - touchStart.current.y;
+      touchStart.current = null;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        if (dx < 0 && page < total) setPage((p) => p + 1);
+        else if (dx > 0 && page > 1) setPage((p) => p - 1);
+      }
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchend", onEnd);
+    };
+  }, [page, total]);
+
+  // Revoke blob URLs on unmount
+  useEffect(() => {
+    const requests = pageRequests;
+    const urls = pageUrls;
+    return () => {
+      requests.current.clear();
+      for (const url of urls.values()) URL.revokeObjectURL(url);
+    };
+  }, []);
+
+  // ── Error screen ──────────────────────────────────────────────────
   if (error && (error.kind === "denied" || error.kind === "missing" || error.kind === "session" || error.kind === "network")) {
     return (
       <div className="container-page flex min-h-[60vh] flex-col items-center justify-center py-20 text-center">
@@ -544,60 +426,16 @@ export function DocumentViewer({
     );
   }
 
-  const renderPageContent = (pageNumber: number) => {
-    const url = pageUrls.get(pageNumber);
-    const loading = loadingPages.has(pageNumber);
-    const pageError = pageErrors.get(pageNumber);
-
-    if (url) {
-      return (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={url}
-          alt={`Page ${pageNumber} of ${total}`}
-          className="block w-full select-none"
-          draggable={false}
-        />
-      );
-    }
-    return (
-      <div
-        className="grid w-full place-items-center bg-white"
-        style={{ aspectRatio: "1 / 1.414" }}
-      >
-        {loading ? (
-          <div className="flex flex-col items-center gap-3 text-neutral-500">
-            <span className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-200 border-t-brand-600" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">
-              Rendering page…
-            </p>
-          </div>
-        ) : pageError ? (
-          <div className="px-8 text-center">
-            <p className="text-sm font-medium text-neutral-700">{pageError}</p>
-            <button
-              className="btn-secondary btn-sm mt-4"
-              onClick={() => retryPage(pageNumber)}
-            >
-              Retry
-            </button>
-          </div>
-        ) : (
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
-            Page {pageNumber}
-          </p>
-        )}
-      </div>
-    );
-  };
+  const url = pageUrls.get(page);
+  const loading = loadingPages.has(page);
+  const pageError = pageErrors.get(page);
 
   return (
     <div
       ref={rootRef}
-      className="relative flex h-[calc(100vh-4rem)] flex-col bg-neutral-100"
+      className="relative flex h-[100dvh] flex-col bg-neutral-100"
     >
-      {/* Screenshot shield: covers the document while the tab is hidden,
-          unfocused, or a capture key was pressed. */}
+      {/* Screenshot shield */}
       {shielded && (
         <div className="absolute inset-0 z-50 grid place-items-center bg-neutral-900 text-center print:hidden">
           <div className="px-6">
@@ -610,14 +448,12 @@ export function DocumentViewer({
               </svg>
             </span>
             <p className="mt-4 text-sm font-semibold text-white">Content hidden</p>
-            <p className="mt-1 text-xs text-neutral-400">
-              This paper is watermarked to your account.
-            </p>
+            <p className="mt-1 text-xs text-neutral-400">This paper is watermarked to your account.</p>
           </div>
         </div>
       )}
 
-      {/* Deterrence toast (capture key / blocked save or print). */}
+      {/* Deterrence toast */}
       {deterrenceNote && (
         <div className="pointer-events-none absolute left-1/2 top-4 z-50 -translate-x-1/2 whitespace-nowrap rounded-full bg-neutral-900/90 px-4 py-2 text-xs font-semibold text-white shadow-lift print:hidden">
           {deterrenceNote}
@@ -625,89 +461,48 @@ export function DocumentViewer({
       )}
 
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-2.5 print:hidden">
-        <h1 className="truncate text-sm font-semibold text-neutral-800">{title}</h1>
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-white px-3 py-2 print:hidden">
+        <h1 className="truncate text-sm font-semibold text-neutral-800 min-w-0">{title}</h1>
+        <div className="flex items-center gap-1 shrink-0">
           {mounted && offlineSupported() && (
             <button
               type="button"
               onClick={() => void saveForOffline()}
               disabled={saveState !== "idle"}
-              title="Save the rendered pages of this paper to your device so you can read it without an internet connection."
-              className={`btn-sm ${
-                saveState === "saved" ? "btn-secondary" : "btn-ghost"
-              }`}
+              title="Save for offline reading"
+              className={`btn-sm ${saveState === "saved" ? "btn-secondary" : "btn-ghost"}`}
             >
               {saveState === "saving" ? (
-                <span className="tabular-nums">
-                  Saving… {saveProgress}/{total}
-                </span>
+                <span className="tabular-nums">{saveProgress}/{total}</span>
               ) : saveState === "saved" ? (
-                <span className="text-brand-700">✓ Saved offline</span>
+                <span className="text-brand-700">✓ Saved</span>
               ) : (
-                <span className="flex items-center gap-1">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M12 3v12" />
-                    <path d="m7 10 5 5 5-5" />
-                    <path d="M5 21h14" />
-                  </svg>
-                  Save offline
-                </span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" />
+                </svg>
               )}
             </button>
           )}
-          {/* Mode toggle */}
-          <div className="flex overflow-hidden rounded-lg border border-neutral-200" role="group" aria-label="Reading mode">
-            <button
-              className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-                mode === "single" ? "bg-brand-700 text-white" : "bg-white text-neutral-600 hover:bg-neutral-50"
-              }`}
-              onClick={() => switchMode("single")}
-              aria-pressed={mode === "single"}
-            >
-              <svg className="mr-1 inline h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <rect x="5" y="3" width="14" height="18" rx="1" />
-              </svg>
-              Pages
-            </button>
-            <button
-              className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-                mode === "continuous" ? "bg-brand-700 text-white" : "bg-white text-neutral-600 hover:bg-neutral-50"
-              }`}
-              onClick={() => switchMode("continuous")}
-              aria-pressed={mode === "continuous"}
-            >
-              <svg className="mr-1 inline h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M3 6h18" />
-                <path d="M3 12h18" />
-                <path d="M3 18h18" />
-              </svg>
-              Scroll
-            </button>
-          </div>
 
-          <button
-            className="btn-ghost btn-sm"
-            onClick={() => setZoom((z) => Math.max(0.6, +(z - 0.2).toFixed(2)))}
-            aria-label="Zoom out"
-          >
+          {/* Zoom controls */}
+          <button className="btn-ghost btn-sm" onClick={zoomOut} aria-label="Zoom out">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
               <path d="M5 12h14" />
             </svg>
           </button>
-          <span className="w-12 text-center text-xs tabular-nums text-neutral-500">
-            {Math.round(zoom * 100)}%
-          </span>
           <button
-            className="btn-ghost btn-sm"
-            onClick={() => setZoom((z) => Math.min(3, +(z + 0.2).toFixed(2)))}
-            aria-label="Zoom in"
+            className="min-w-[44px] text-center text-xs tabular-nums text-neutral-500 hover:text-neutral-700"
+            onClick={resetZoom}
+            title="Reset zoom"
           >
+            {Math.round(displayZoom * 100)}%
+          </button>
+          <button className="btn-ghost btn-sm" onClick={zoomIn} aria-label="Zoom in">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
+              <path d="M12 5v14" /><path d="M5 12h14" />
             </svg>
           </button>
+
           <button className="btn-ghost btn-sm" onClick={goFullscreen} aria-label="Fullscreen">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M8 3H5a2 2 0 0 0-2 2v3" />
@@ -719,7 +514,7 @@ export function DocumentViewer({
         </div>
       </div>
 
-      {/* Save error banner */}
+      {/* Save error */}
       {saveError && (
         <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-700 print:hidden">
           {saveError}
@@ -727,84 +522,70 @@ export function DocumentViewer({
       )}
 
       {/* Progress bar */}
-      <div className="h-1 w-full bg-neutral-200 print:hidden">
+      <div className="h-0.5 w-full bg-neutral-200 print:hidden">
         <div
-          className="h-full bg-gradient-to-r from-brand-600 to-brand-500 transition-[width] duration-200"
+          className="h-full bg-gradient-to-r from-brand-600 to-brand-500 transition-[width] duration-300 ease-out"
           style={{ width: `${Math.round(progress * 100)}%` }}
         />
       </div>
 
-      {/* Page canvas — no context menu, no long-press save, no selection */}
+      {/* Page canvas */}
       <div
-        ref={shellRef}
+        ref={imgContainerRef}
         onContextMenu={(e) => e.preventDefault()}
-        className="relative flex-1 select-none overflow-auto p-4 [-webkit-touch-callout:none] print:hidden"
+        className="relative flex-1 overflow-hidden select-none [-webkit-touch-callout:none] print:hidden"
       >
-        {mode === "single" ? (
-          <div className="flex items-start justify-center">
-            <div
-              className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-lg border border-neutral-300 bg-white shadow-card"
-              style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
-            >
-              {renderPageContent(page)}
+        <div className="flex h-full items-start justify-center overflow-auto p-4">
+          <div
+            className="mx-auto w-full max-w-2xl origin-top transition-transform duration-200 ease-out"
+            style={{ transform: `scale(${displayZoom})` }}
+          >
+            <div className="relative overflow-hidden rounded-lg border border-neutral-300 bg-white shadow-card">
+              {url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={url}
+                  alt={`Page ${page} of ${total}`}
+                  className="block w-full select-none"
+                  draggable={false}
+                />
+              ) : (
+                <div
+                  className="grid w-full place-items-center bg-white"
+                  style={{ aspectRatio: "1 / 1.414" }}
+                >
+                  {loading ? (
+                    <div className="flex flex-col items-center gap-3 text-neutral-500">
+                      <span className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-200 border-t-brand-600" />
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">Rendering…</p>
+                    </div>
+                  ) : pageError ? (
+                    <div className="px-8 text-center">
+                      <p className="text-sm font-medium text-neutral-700">{pageError}</p>
+                      <button className="btn-secondary btn-sm mt-4" onClick={() => retryPage(page)}>Retry</button>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">Page {page}</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        ) : (
-          <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-            {Array.from({ length: total }, (_, i) => i + 1).map((p) => (
-              <div
-                key={p}
-                ref={(node) => {
-                  pageRefs.current[p - 1] = node;
-                }}
-                data-page={p}
-              >
-                <div
-                  className="relative mx-auto overflow-hidden rounded-lg border border-neutral-300 bg-white shadow-card"
-                  style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
-                >
-                  {renderPageContent(p)}
-                </div>
-                <p className="mt-1 text-center text-[11px] tabular-nums text-neutral-400">
-                  {p} / {total}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Bottom controls */}
-      <div className="relative flex items-center justify-center gap-4 border-t border-neutral-200 bg-white px-4 py-2.5 print:hidden">
-        {mode === "single" && (
-          <>
-            <button
-              className="btn-secondary btn-sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1 || loadingPages.has(page)}
-            >
-              ← Previous
-            </button>
-            <span className="text-sm tabular-nums text-neutral-600">
-              Page {page} of {total}
-            </span>
-            <button
-              className="btn-secondary btn-sm"
-              onClick={() => setPage((p) => Math.min(total, p + 1))}
-              disabled={page >= total || loadingPages.has(page)}
-            >
-              Next →
-            </button>
-          </>
-        )}
-        {mode === "continuous" && (
-          <span className="text-sm text-neutral-600">
-            Scrolling · <span className="tabular-nums font-medium text-neutral-800">{scrollPage}</span> of {total}
-          </span>
-        )}
+      <div className="relative flex items-center justify-between border-t border-neutral-200 bg-white px-3 py-2 print:hidden">
+        <button
+          className="btn-secondary btn-sm"
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page <= 1 || loadingPages.has(page)}
+        >
+          ← Prev
+        </button>
 
-        {/* Jump-to-page + progress pill */}
-        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+        {/* Jump-to-page */}
+        <div className="flex items-center">
           {jumpOpen ? (
             <div className="flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-2 py-1 shadow-card">
               <input
@@ -812,14 +593,13 @@ export function DocumentViewer({
                 min={1}
                 max={total}
                 autoFocus
-                defaultValue={displayPage}
+                defaultValue={page}
                 aria-label="Go to page"
-                className="w-16 rounded-md border border-neutral-300 px-2 py-1 text-xs tabular-nums outline-none focus:border-brand-600"
+                className="w-14 rounded-md border border-neutral-300 px-2 py-1 text-xs tabular-nums outline-none focus:border-brand-600"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     const v = Math.min(total, Math.max(1, Number((e.target as HTMLInputElement).value) || 1));
-                    if (mode === "single") setPage(v);
-                    else scrollToPage(v);
+                    setPage(v);
                     setJumpOpen(false);
                   }
                   if (e.key === "Escape") setJumpOpen(false);
@@ -830,8 +610,7 @@ export function DocumentViewer({
                 onClick={(e) => {
                   const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
                   const v = Math.min(total, Math.max(1, Number(input.value) || 1));
-                  if (mode === "single") setPage(v);
-                  else scrollToPage(v);
+                  setPage(v);
                   setJumpOpen(false);
                 }}
               >
@@ -840,28 +619,28 @@ export function DocumentViewer({
             </div>
           ) : (
             <button
-              className="flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold tabular-nums text-neutral-700 shadow-sm transition hover:border-brand-300 hover:text-brand-700"
+              className="text-sm tabular-nums text-neutral-600 hover:text-brand-700"
               onClick={() => setJumpOpen(true)}
-              title="Jump to page"
             >
-              <svg className="h-3.5 w-3.5 text-brand-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M12 5v14" />
-                <path d="m19 12-7 7-7-7" />
-              </svg>
-              {displayPage} / {total}
-              <span className="text-neutral-400">·</span>
-              <span className="text-brand-700">{Math.round(progress * 100)}%</span>
+              {page} / {total}
             </button>
           )}
         </div>
+
+        <button
+          className="btn-secondary btn-sm"
+          onClick={() => setPage((p) => Math.min(total, p + 1))}
+          disabled={page >= total || loadingPages.has(page)}
+        >
+          Next →
+        </button>
       </div>
 
-      {/* Print guard: the printed page shows only this notice (spec §14). */}
+      {/* Print guard */}
       <div className="hidden py-20 text-center print:block">
         <p className="text-lg font-semibold">Printing is not available</p>
         <p className="mx-auto mt-2 max-w-md text-sm text-neutral-600">
-          This paper can only be read in the secure viewer, where every page
-          is watermarked to your account.
+          This paper can only be read in the secure viewer, where every page is watermarked to your account.
         </p>
       </div>
     </div>
