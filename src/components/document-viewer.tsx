@@ -548,12 +548,19 @@ export function DocumentViewer({
         onContextMenu={(e) => e.preventDefault()}
         className="relative flex-1 overflow-hidden select-none [-webkit-touch-callout:none] print:hidden"
       >
-        <div className="flex h-full items-start justify-center overflow-auto p-4">
+        <div className="flex h-full items-center justify-center overflow-auto p-4">
           <div
-            className="mx-auto w-full max-w-2xl origin-top transition-transform duration-200 ease-out"
-            style={{ transform: `scale(${displayZoom}) rotate(${rotation}deg)` }}
+            className="mx-auto w-full transition-transform duration-200 ease-out"
+            style={{
+              maxWidth: rotation % 180 === 0 ? undefined : "min(90vh, 100%)",
+              transformOrigin: "center center",
+              transform: `scale(${displayZoom}) rotate(${rotation}deg)`,
+            }}
           >
-            <div className="relative overflow-hidden rounded-lg border border-neutral-300 bg-white shadow-card dark:border-neutral-700 dark:bg-neutral-900">
+            <div
+              className="relative overflow-hidden rounded-lg border border-neutral-300 bg-white shadow-card dark:border-neutral-700 dark:bg-neutral-900"
+              style={rotation % 180 !== 0 ? { aspectRatio: "1.414 / 1" } : undefined}
+            >
               {url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -565,7 +572,7 @@ export function DocumentViewer({
               ) : (
                 <div
                   className="grid w-full place-items-center bg-white"
-                  style={{ aspectRatio: "1 / 1.414" }}
+                  style={{ aspectRatio: rotation % 180 !== 0 ? "1.414 / 1" : "1 / 1.414" }}
                 >
                   {loading ? (
                     <div className="flex flex-col items-center gap-3 text-neutral-500">
