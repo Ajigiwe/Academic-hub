@@ -28,7 +28,7 @@ WORKDIR /app
 # silently produces nothing, so pages render blank of any text.
 # jpeg-turbo is required for pdf.js to decode JPEG images inside PDFs;
 # without it any PDF containing photos / scans fails to render.
-RUN apk add --no-cache fontconfig font-dejavu jpeg-turbo
+RUN apk add --no-cache fontconfig font-dejavu libjpeg-turbo
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
