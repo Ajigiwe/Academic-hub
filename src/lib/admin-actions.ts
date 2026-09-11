@@ -14,6 +14,8 @@ import {
   formatZodIssues,
   MAX_UPLOAD_BYTES,
   slugify,
+  formString,
+  formNumber,
 } from "@/lib/resource-admin";
 import { grantBundlePapersToPastBuyers } from "@/lib/entitlement-grant";
 import { programmeSettingKey, getAllProgrammesWithVisibility } from "@/lib/settings";
@@ -69,14 +71,14 @@ export async function uploadBundleFilesAction(
   let bundleFields: z.infer<typeof bundleFormSchema> | undefined;
   if (!bundleId) {
     const parsed = bundleFormSchema.safeParse({
-      title: formData.get("title"),
-      description: formData.get("description"),
-      level: formData.get("level"),
-      academicYear: formData.get("academicYear"),
-      price: formData.get("price"),
-      courseCode: formData.get("courseCode"),
-      courseTitle: formData.get("courseTitle"),
-      programmeName: formData.get("programmeName"),
+      title: formString(formData, "title"),
+      description: formString(formData, "description"),
+      level: formNumber(formData, "level"),
+      academicYear: formString(formData, "academicYear"),
+      price: formNumber(formData, "price"),
+      courseCode: formString(formData, "courseCode"),
+      courseTitle: formString(formData, "courseTitle"),
+      programmeName: formString(formData, "programmeName"),
     });
     if (!parsed.success) {
       return { ok: false, message: formatZodIssues(parsed.error) };
@@ -143,14 +145,14 @@ export async function uploadFreeMaterialAction(
   }
 
   const parsed = freeMaterialFormSchema.safeParse({
-    title: formData.get("title"),
-    description: formData.get("description"),
-    type: formData.get("type"),
-    level: formData.get("level"),
-    semester: formData.get("semester"),
-    courseCode: formData.get("courseCode"),
-    courseTitle: formData.get("courseTitle"),
-    programmeName: formData.get("programmeName"),
+    title: formString(formData, "title"),
+    description: formString(formData, "description"),
+    type: formString(formData, "type"),
+    level: formNumber(formData, "level"),
+    semester: formNumber(formData, "semester"),
+    courseCode: formString(formData, "courseCode"),
+    courseTitle: formString(formData, "courseTitle"),
+    programmeName: formString(formData, "programmeName"),
   });
   if (!parsed.success) {
     return { ok: false, message: formatZodIssues(parsed.error) };
@@ -288,9 +290,9 @@ export async function updateResourceAction(
   if (!resourceId) return { ok: false, message: "Missing resource." };
 
   const parsed = resourceEditSchema.safeParse({
-    description: formData.get("description") ?? "",
-    type: formData.get("type"),
-    programmeName: formData.get("programmeName"),
+    description: formString(formData, "description"),
+    type: formString(formData, "type"),
+    programmeName: formString(formData, "programmeName"),
   });
   if (!parsed.success) {
     return { ok: false, message: formatZodIssues(parsed.error) };

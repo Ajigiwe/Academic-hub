@@ -29,7 +29,7 @@ export const bundleFormSchema = z.object({
     .optional()
     .transform((v) => v || undefined),
   level: z.coerce
-    .number()
+    .number({ message: "Level is required." })
     .int("Level must be a whole number.")
     .min(100, "Level must be 100–400.")
     .max(400, "Level must be 100–400."),
@@ -75,7 +75,7 @@ export const freeMaterialFormSchema = z.object({
     .transform((v) => v || undefined),
   type: z.enum(["LECTURE_NOTES", "SLIDES", "REVISION", "PRACTICE"]),
   level: z.coerce
-    .number()
+    .number({ message: "Level is required." })
     .int("Level must be a whole number.")
     .min(100, "Level must be 100–400.")
     .max(400, "Level must be 100–400."),
@@ -104,7 +104,32 @@ export const freeMaterialFormSchema = z.object({
 export type FreeMaterialFormInput = z.infer<typeof freeMaterialFormSchema>;
 
 export function formatZodIssues(error: z.ZodError): string {
-  return error.issues.map((i) => i.message).join(" ");
+  // Name each offending field so an admin sees WHAT to fix, not just
+  // "expected string, received null" repeated five times.
+  return error.issues
+    .map((i) => {
+      const field = i.path.join(".");
+      return field ? `${field}: ${i.message}` : i.message;
+    })
+    .join(" · ");
+}
+
+/**
+ * FormData values as trim-normalized strings — missing fields arrive as
+ * null, which zod would reject with an opaque "expected string, received
+ * null"; normalize to "" so schema messages ("is required") render.
+ */
+export function formString(formData: FormData, key: string): string {
+  const v = formData.get(key);
+  return typeof v === "string" ? v.trim() : "";
+}
+
+/** Numeric form field that coerces only real values — null becomes a
+ * schema-level failure ("is required"), never a silent 0-coercion. */
+export function formNumber(formData: FormData, key: string): unknown {
+  const v = formData.get(key);
+  if (v === null || (typeof v === "string" && v.trim() === "")) return undefined;
+  return v;
 }
 
 function createChecksum(buf: Buffer): string {

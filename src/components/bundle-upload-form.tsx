@@ -42,7 +42,11 @@ export function BundleUploadForm({
     uploadBundleFilesAction,
     {},
   );
-  const [creatingBundle, setCreatingBundle] = useState(false);
+  // The select defaults to "Create a new bundle", so the metadata section
+  // must render by default — deriving it from onChange alone meant the
+  // fields never mounted until the user touched the select, and a submit
+  // then sent nulls for every metadata field.
+  const [creatingBundle, setCreatingBundle] = useState(true);
 
   return (
     <form action={formAction} className="space-y-4">
