@@ -462,8 +462,8 @@ export function DocumentViewer({
       )}
 
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-white px-3 py-2 print:hidden">
-        <h1 className="truncate text-sm font-semibold text-neutral-800 min-w-0">{title}</h1>
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-950 print:hidden">
+        <h1 className="truncate text-sm font-semibold text-neutral-800 dark:text-neutral-200 min-w-0">{title}</h1>
         <div className="flex items-center gap-1 shrink-0">
           {mounted && offlineSupported() && (
             <button
@@ -492,7 +492,7 @@ export function DocumentViewer({
             </svg>
           </button>
           <button
-            className="min-w-[44px] text-center text-xs tabular-nums text-neutral-500 hover:text-neutral-700"
+            className="min-w-[44px] text-center text-xs tabular-nums text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
             onClick={resetZoom}
             title="Reset zoom"
           >
@@ -529,13 +529,13 @@ export function DocumentViewer({
 
       {/* Save error */}
       {saveError && (
-        <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-700 print:hidden">
+        <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300 print:hidden">
           {saveError}
         </div>
       )}
 
       {/* Progress bar */}
-      <div className="h-0.5 w-full bg-neutral-200 print:hidden">
+      <div className="h-0.5 w-full bg-neutral-200 dark:bg-neutral-800 print:hidden">
         <div
           className="h-full bg-gradient-to-r from-brand-600 to-brand-500 transition-[width] duration-300 ease-out"
           style={{ width: `${Math.round(progress * 100)}%` }}
@@ -553,7 +553,7 @@ export function DocumentViewer({
             className="mx-auto w-full max-w-2xl origin-top transition-transform duration-200 ease-out"
             style={{ transform: `scale(${displayZoom}) rotate(${rotation}deg)` }}
           >
-            <div className="relative overflow-hidden rounded-lg border border-neutral-300 bg-white shadow-card">
+            <div className="relative overflow-hidden rounded-lg border border-neutral-300 bg-white shadow-card dark:border-neutral-700 dark:bg-neutral-900">
               {url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -588,7 +588,7 @@ export function DocumentViewer({
       </div>
 
       {/* Bottom controls */}
-      <div className="relative flex items-center justify-between border-t border-neutral-200 bg-white px-3 py-2 print:hidden">
+      <div className="relative flex items-center justify-between border-t border-neutral-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-950 print:hidden">
         <button
           className="btn-secondary btn-sm"
           onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -600,7 +600,7 @@ export function DocumentViewer({
         {/* Jump-to-page */}
         <div className="flex items-center">
           {jumpOpen ? (
-            <div className="flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-2 py-1 shadow-card">
+            <div className="flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-2 py-1 shadow-card dark:border-neutral-700 dark:bg-neutral-800">
               <input
                 type="number"
                 min={1}
@@ -608,7 +608,7 @@ export function DocumentViewer({
                 autoFocus
                 defaultValue={page}
                 aria-label="Go to page"
-                className="w-14 rounded-md border border-neutral-300 px-2 py-1 text-xs tabular-nums outline-none focus:border-brand-600"
+                className="w-14 rounded-md border border-neutral-300 px-2 py-1 text-xs tabular-nums outline-none focus:border-brand-600 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     const v = Math.min(total, Math.max(1, Number((e.target as HTMLInputElement).value) || 1));
@@ -632,7 +632,7 @@ export function DocumentViewer({
             </div>
           ) : (
             <button
-              className="text-sm tabular-nums text-neutral-600 hover:text-brand-700"
+              className="text-sm tabular-nums text-neutral-600 hover:text-brand-700 dark:text-neutral-400 dark:hover:text-brand-400"
               onClick={() => setJumpOpen(true)}
             >
               {page} / {total}

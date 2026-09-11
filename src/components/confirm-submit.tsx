@@ -43,16 +43,16 @@ export function ConfirmSubmit({
             if (e.target === e.currentTarget) setOpen(false);
           }}
         >
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
-            <h3 className="text-lg font-semibold text-neutral-900">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl dark:bg-neutral-900">
+            <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
               Confirm deletion
             </h3>
-            <p className="mt-2 text-sm text-neutral-600">{message}</p>
+            <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">{message}</p>
             <div className="mt-6 flex justify-center gap-3">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-xl border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                className="rounded-xl border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
               >
                 Cancel
               </button>

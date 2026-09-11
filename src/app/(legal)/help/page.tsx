@@ -33,9 +33,9 @@ export default function HelpPage() {
         {faqs.map((f) => (
           <details
             key={f.q}
-            className="group rounded-xl border border-neutral-200 bg-white p-4 shadow-sm [&_summary::-webkit-details-marker]:hidden"
+            className="group rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 [&_summary::-webkit-details-marker]:hidden"
           >
-            <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-neutral-900">
+            <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">
               {f.q}
               <svg
                 className="h-4 w-4 shrink-0 text-neutral-400 transition-transform group-open:rotate-180"
@@ -50,12 +50,12 @@ export default function HelpPage() {
                 <path d="m6 9 6 6 6-6" />
               </svg>
             </summary>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-600">{f.a}</p>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">{f.a}</p>
           </details>
         ))}
       </div>
 
-      <div className="rounded-xl border border-brand-100 bg-brand-50 p-5">
+      <div className="rounded-xl border border-brand-100 bg-brand-50 p-5 dark:border-brand-900 dark:bg-brand-950">
         <h2 className="!mt-0">Still need help?</h2>
         <p>
           Email <span className="font-semibold">support@academicresourcehub.com</span>{" "}

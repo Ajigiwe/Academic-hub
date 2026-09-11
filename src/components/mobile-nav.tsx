@@ -91,7 +91,7 @@ export function MobileNav({
   ];
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950/95 md:hidden">
       <div className="grid grid-flow-col auto-cols-fr">
         {items.map((item) => {
           const active =
@@ -101,12 +101,12 @@ export function MobileNav({
               key={item.href + item.label}
               href={item.href}
               className={`flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors ${
-                active ? "text-brand-700" : "text-neutral-500"
+                active ? "text-brand-700 dark:text-brand-400" : "text-neutral-500 dark:text-neutral-400"
               }`}
             >
               <span
                 className={`rounded-lg px-3 py-0.5 transition-colors ${
-                  active ? "bg-brand-50" : ""
+                  active ? "bg-brand-50 dark:bg-brand-950" : ""
                 }`}
               >
                 {item.icon}

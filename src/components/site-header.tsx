@@ -31,7 +31,7 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden items-center gap-1 text-sm font-medium text-neutral-700 md:flex">
+        <nav className="hidden items-center gap-1 text-sm font-medium text-neutral-700 dark:text-neutral-300 md:flex">
           {[
             { href: "/browse", label: "Browse" },
             { href: "/search", label: "Search" },
@@ -41,7 +41,7 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
             <Link
               key={item.href}
               href={item.href}
-              className="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-brand-800"
+              className="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-brand-800 dark:hover:bg-brand-950 dark:hover:text-brand-300"
             >
               {item.label}
             </Link>
@@ -54,12 +54,12 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
             <>
               <Link
                 href="/account"
-                className="flex items-center gap-2 rounded-full border border-neutral-200 bg-white py-1 pl-1 pr-3 shadow-sm transition hover:border-brand-300"
+                className="flex items-center gap-2 rounded-full border border-neutral-200 bg-white py-1 pl-1 pr-3 shadow-sm transition hover:border-brand-300 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:border-brand-600"
               >
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-800">
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-800 dark:bg-brand-900 dark:text-brand-300">
                   {user.firstName.slice(0, 1).toUpperCase()}
                 </span>
-                <span className="text-sm font-medium text-neutral-700">{user.firstName}</span>
+                <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{user.firstName}</span>
               </Link>
               <LogoutButton />
             </>
@@ -83,7 +83,7 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
             <Link
               href="/account"
               aria-label="My account"
-              className="grid h-8 w-8 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-800"
+              className="grid h-8 w-8 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-800 dark:bg-brand-900 dark:text-brand-300"
             >
               {user.firstName.slice(0, 1).toUpperCase()}
             </Link>

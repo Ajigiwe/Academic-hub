@@ -4,9 +4,9 @@ export default function HomePage() {
   return (
     <div>
       {/* Hero + intent entry (client flow: choose what you came for) */}
-      <section className="relative overflow-hidden border-b border-neutral-200">
+      <section className="relative overflow-hidden border-b border-neutral-200 dark:border-neutral-800">
         {/* Layered brand backdrop */}
-        <div className="absolute inset-0 bg-gradient-to-b from-brand-50 via-white to-neutral-50" />
+        <div className="absolute inset-0 bg-gradient-to-b from-brand-50 via-white to-neutral-50 dark:from-brand-950 dark:via-neutral-950 dark:to-neutral-950" />
         <div
           aria-hidden
           className="absolute inset-0 opacity-[0.35]"
@@ -17,13 +17,13 @@ export default function HomePage() {
         />
         <div className="container-page relative py-14 sm:py-16 lg:py-20">
           <div className="text-center">
-            <h1 className="mx-auto max-w-2xl text-balance text-4xl font-extrabold tracking-[-0.035em] text-neutral-900 sm:text-6xl">
+            <h1 className="mx-auto max-w-2xl text-balance text-4xl font-extrabold tracking-[-0.035em] text-neutral-900 dark:text-neutral-100 sm:text-6xl">
               Find the Past Questions{" "}
-              <span className="bg-gradient-to-r from-brand-700 to-brand-500 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-brand-700 to-brand-500 dark:from-brand-400 dark:to-brand-300 bg-clip-text text-transparent">
                 You Need.
               </span>
             </h1>
-            <p className="mx-auto mt-4 max-w-xl text-base text-neutral-600 sm:text-lg">
+            <p className="mx-auto mt-4 max-w-xl text-base text-neutral-600 dark:text-neutral-400 sm:text-lg">
               Solved &amp; unsolved past questions for your course and year, plus
               free slides and notes — tell us what you came for and we&apos;ll
               take you there.
@@ -33,7 +33,7 @@ export default function HomePage() {
             <div className="mx-auto mt-8 grid max-w-2xl gap-4 sm:grid-cols-2 sm:gap-5">
               <Link
                 href="/courses"
-                className="group relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-brand-500 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:p-7"
+                className="group relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-brand-500 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 dark:border-neutral-800 dark:bg-neutral-900 sm:p-7"
               >
                 {/* Soft glow that fades in behind the icon on hover */}
                 <div
@@ -46,17 +46,17 @@ export default function HomePage() {
                     <path d="M14 2v6h6" />
                   </svg>
                 </span>
-                <p className="relative mt-4 text-lg font-bold text-neutral-900">
+                <p className="relative mt-4 text-lg font-bold text-neutral-900 dark:text-neutral-100">
                   Past questions
                 </p>
-                <p className="relative mt-1 text-sm text-neutral-600">
+                <p className="relative mt-1 text-sm text-neutral-600 dark:text-neutral-400">
                   Solved &amp; unsolved papers by course &amp; year — for sale.
                 </p>
                 <span className="relative mt-5 flex items-center justify-between">
                   <span className="badge-brand font-semibold">For sale</span>
                   <span
                     aria-hidden
-                    className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 transition-transform duration-200 group-hover:translate-x-1"
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 dark:text-brand-400 transition-transform duration-200 group-hover:translate-x-1"
                   >
                     Browse papers →
                   </span>
@@ -64,7 +64,7 @@ export default function HomePage() {
               </Link>
               <Link
                 href="/materials"
-                className="group relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-amber-400 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 sm:p-7"
+                className="group relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-amber-400 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:border-neutral-800 dark:bg-neutral-900 sm:p-7"
               >
                 <div
                   aria-hidden
@@ -76,17 +76,17 @@ export default function HomePage() {
                     <path d="M7 8h10M7 12h10M7 16h6" />
                   </svg>
                 </span>
-                <p className="relative mt-4 text-lg font-bold text-neutral-900">
+                <p className="relative mt-4 text-lg font-bold text-neutral-900 dark:text-neutral-100">
                   Course materials
                 </p>
-                <p className="relative mt-1 text-sm text-neutral-600">
+                <p className="relative mt-1 text-sm text-neutral-600 dark:text-neutral-400">
                   Slides & notes — free to download.
                 </p>
                 <span className="relative mt-5 flex items-center justify-between">
                   <span className="badge-gold font-semibold">Free</span>
                   <span
                     aria-hidden
-                    className="inline-flex items-center gap-1 text-sm font-semibold text-amber-700 transition-transform duration-200 group-hover:translate-x-1"
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-amber-700 dark:text-amber-400 transition-transform duration-200 group-hover:translate-x-1"
                   >
                     Browse materials →
                   </span>

@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Type — Fraunces display serif for headings, system sans for body */
   --font-display: var(--font-fraunces), ui-serif, Georgia, "Times New Roman", serif;
@@ -34,8 +36,7 @@
   body {
     @apply bg-neutral-50 text-neutral-900 antialiased;
   }
-  .dark body,
-  .dark {
+  :root.dark body {
     @apply bg-neutral-950 text-neutral-100;
   }
   /* Headings: display serif with a stepped tracking scale — the tighter
@@ -68,9 +69,6 @@
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-50 border border-neutral-300 bg-white text-neutral-800 shadow-soft hover:border-neutral-400 hover:bg-neutral-50;
   }
-  .dark .btn-secondary {
-    @apply border-neutral-700 bg-neutral-800 text-neutral-200 hover:border-neutral-600 hover:bg-neutral-700;
-  }
   .btn-gold {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-50 bg-gold-500 text-white shadow-soft hover:bg-gold-600;
   }
@@ -80,9 +78,6 @@
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-50 text-neutral-700 hover:bg-neutral-100;
   }
-  .dark .btn-ghost {
-    @apply text-neutral-300 hover:bg-neutral-800;
-  }
   .btn-sm {
     @apply px-3 py-1.5 text-xs;
   }
@@ -91,30 +86,18 @@
   .label {
     @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-neutral-600;
   }
-  .dark .label {
-    @apply text-neutral-400;
-  }
   .input {
     /* 16px minimum: iOS zooms any focused input below 16px, and the zoom
        persists across navigations, making pages look oversized on phones. */
     @apply w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-base text-neutral-900 placeholder-neutral-400 shadow-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20;
-  }
-  .dark .input {
-    @apply border-neutral-700 bg-neutral-800 text-neutral-100 placeholder-neutral-500;
   }
 
   /* Surfaces */
   .card {
     @apply rounded-xl border border-neutral-200 bg-white shadow-soft;
   }
-  .dark .card {
-    @apply border-neutral-800 bg-neutral-900;
-  }
   .card-padded {
     @apply rounded-xl border border-neutral-200 bg-white p-5 shadow-soft;
-  }
-  .dark .card-padded {
-    @apply border-neutral-800 bg-neutral-900;
   }
 
   /* Badges */
@@ -124,32 +107,17 @@
   .badge-brand {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-brand-50 text-brand-700;
   }
-  .dark .badge-brand {
-    @apply bg-brand-950 text-brand-300;
-  }
   .badge-neutral {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-neutral-100 text-neutral-700;
-  }
-  .dark .badge-neutral {
-    @apply bg-neutral-800 text-neutral-300;
   }
   .badge-gold {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-50 text-amber-700;
   }
-  .dark .badge-gold {
-    @apply bg-amber-950 text-amber-300;
-  }
   .badge-success {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800;
   }
-  .dark .badge-success {
-    @apply bg-green-950 text-green-300;
-  }
   .badge-danger {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-700;
-  }
-  .dark .badge-danger {
-    @apply bg-red-950 text-red-300;
   }
 
   /* Tables (admin) */
@@ -250,5 +218,90 @@
   }
   .admin-nav-link-active {
     @apply flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium bg-white/10 text-white;
+  }
+}
+
+/* ── Dark mode overrides (un-layered for higher specificity) ── */
+:root.dark {
+  color-scheme: dark;
+}
+
+:root.dark body {
+  @apply bg-neutral-950 text-neutral-100;
+}
+
+/* Hero / page sections */
+:root.dark section {
+  @apply border-neutral-800;
+}
+
+/* All text color overrides for dark mode */
+:root.dark .text-neutral-900 { @apply text-neutral-100; }
+:root.dark .text-neutral-800 { @apply text-neutral-200; }
+:root.dark .text-neutral-700 { @apply text-neutral-300; }
+:root.dark .text-neutral-600 { @apply text-neutral-400; }
+:root.dark .text-neutral-500 { @apply text-neutral-500; }
+
+/* Background overrides */
+:root.dark .bg-white { @apply bg-neutral-900; }
+:root.dark .bg-neutral-50 { @apply bg-neutral-900; }
+:root.dark .bg-neutral-100 { @apply bg-neutral-800; }
+:root.dark .bg-neutral-200 { @apply bg-neutral-700; }
+
+/* Border overrides */
+:root.dark .border-neutral-200 { @apply border-neutral-800; }
+:root.dark .border-neutral-300 { @apply border-neutral-700; }
+:root.dark .border-neutral-100 { @apply border-neutral-800; }
+:root.dark .border-neutral-400 { @apply border-neutral-600; }
+
+/* Buttons */
+:root.dark .btn-secondary { @apply border-neutral-700 bg-neutral-800 text-neutral-200 hover:border-neutral-600 hover:bg-neutral-700; }
+:root.dark .btn-ghost { @apply text-neutral-300 hover:bg-neutral-800; }
+
+/* Forms */
+:root.dark .label { @apply text-neutral-400; }
+:root.dark .input { @apply border-neutral-700 bg-neutral-800 text-neutral-100 placeholder-neutral-500; }
+
+/* Surfaces */
+:root.dark .card { @apply border-neutral-800 bg-neutral-900; }
+:root.dark .card-padded { @apply border-neutral-800 bg-neutral-900; }
+
+/* Badges */
+:root.dark .badge-brand { @apply bg-brand-950 text-brand-300; }
+:root.dark .badge-neutral { @apply bg-neutral-800 text-neutral-300; }
+:root.dark .badge-gold { @apply bg-amber-950 text-amber-300; }
+:root.dark .badge-success { @apply bg-green-950 text-green-300; }
+:root.dark .badge-danger { @apply bg-red-950 text-red-300; }
+
+/* Hero gradient */
+:root.dark .from-brand-50 { --tw-gradient-from: #0b2d5b; }
+:root.dark .via-white { --tw-gradient-via: #171717; }
+:root.dark .to-neutral-50 { --tw-gradient-to: #0a0a0a; }
+
+/* Shadow overrides */
+:root.dark .shadow-soft { box-shadow: 0 1px 2px rgb(0 0 0 / 0.3); }
+:root.dark .shadow-card { box-shadow: 0 2px 4px -2px rgb(0 0 0 / 0.4), 0 4px 8px -2px rgb(0 0 0 / 0.3); }
+:root.dark .shadow-md { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3); }
+:root.dark .shadow-lift { box-shadow: 0 4px 6px -2px rgb(0 0 0 / 0.4), 0 10px 16px -4px rgb(0 0 0 / 0.5); }
+:root.dark .shadow-sm { box-shadow: 0 1px 2px rgb(0 0 0 / 0.3); }
+
+/* Ring overrides for inputs */
+:root.dark .focus\:ring-brand-600\/20:focus { --tw-ring-color: rgb(37 99 235 / 0.3); }
+
+/* Gradient text */
+:root.dark .from-brand-700 { --tw-gradient-from: #93b4fd; }
+:root.dark .to-brand-500 { --tw-gradient-to: #608afa; }
+
+/* Responsive table dark mode */
+@media (max-width: 767px) {
+  :root.dark .table-responsive tr {
+    border-color: #1f1f1f;
+    background: #171717;
+  }
+  :root.dark .table-responsive td {
+    border-color: #1f1f1f;
+  }
+  :root.dark .table-responsive td[data-label=""] {
+    background: #1f1f1f;
   }
 }
