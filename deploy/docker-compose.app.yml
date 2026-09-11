@@ -38,6 +38,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # Keeps the standalone process alive past slow uploads / big renders.
     environment:
       NODE_OPTIONS: "--max-old-space-size=1536"
