@@ -32,14 +32,11 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:3001:3000"
+    network_mode: host
     env_file: .env.production
     depends_on:
       postgres:
         condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     # Keeps the standalone process alive past slow uploads / big renders.
     environment:
       NODE_OPTIONS: "--max-old-space-size=1536"
