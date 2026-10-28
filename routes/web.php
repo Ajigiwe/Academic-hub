@@ -17,6 +17,8 @@ use App\Http\Controllers\ViewerController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [CatalogController::class, 'home'])->name('home');
+// PWA offline fallback — served by the service worker when a page isn't cached.
+Route::get('/offline', fn () => view('offline'))->name('offline');
 Route::get('/search', [SearchController::class, 'index'])->name('search');
 Route::get('/courses', [CatalogController::class, 'courses'])->name('courses');
 Route::get('/bundles/{slug}', [CatalogController::class, 'showBundle'])->name('bundles.show');

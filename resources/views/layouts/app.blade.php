@@ -4,6 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b2d5b">
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="#0b2d5b" />
+    <meta name="msapplication-TileColor" content="#0b2d5b" />
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <title>@yield('title', 'Academic Hub — Find. Purchase. Study.')</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('icon.svg') }}">
     {{-- DEV-ONLY Tailwind (compile with Vite before production) --}}
@@ -118,6 +123,13 @@
         .dark .text-amber-600, .dark .text-amber-700, .dark .text-amber-800 { color: #fcd34d; }
         .dark input, .dark select, .dark textarea { color-scheme: dark; }
         .dark ::placeholder { color: #737373; opacity: 1; }
+        /* PWA install banner — hidden until JS sets data-state="show".
+           (The Tailwind classes on the element can't do this: the
+           group-data variant needs a parent group + data attr, and the
+           element carries opacity-0 which never gets overridden.) */
+        #install-banner { transform: translateY(-100%); opacity: 0; visibility: hidden;
+            transition: transform .3s ease, opacity .3s ease; }
+        #install-banner[data-state="show"] { transform: translateY(0); opacity: 1; visibility: visible; }
     </style>
     <script>
         try {
@@ -245,6 +257,26 @@
 
 @stack('scripts')
 <script>
+    // PWA: register the service worker (the browser only offers the
+    // install prompt for a registered worker + manifest).
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/sw.js').catch(function (err) {
+                console.warn('[SW] Registration failed:', err);
+            });
+        });
+    }
+
+    // PWA: capture the browser's install prompt in the page (it fires
+    // on window, NOT in the service worker), stash it for the Install
+    // button, and notify the banner below to show itself.
+    window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault(); // suppress Chrome's mini-infobar
+        window.deferredPrompt = e;
+        window.dispatchEvent(new CustomEvent('sw:installprompt', { detail: e }));
+    });
+</script>
+<script>
     // Theme toggle — cycles light/dark, persists in the same key as the
     // original app ('arh-theme').
     function cycleTheme(btn) {
@@ -283,6 +315,96 @@
         btn.querySelectorAll('.pw-icon-show').forEach(function (el) { el.classList.toggle('hidden', revealed); });
         btn.querySelectorAll('.pw-icon-hide').forEach(function (el) { el.classList.toggle('hidden', !revealed); });
     });
+</script>
+<!-- Install banner shown to users who havent added the app to their home screen -->
+<div id="install-banner" class="fixed top-0 left-0 right-0 z-50 bg-neutral-900/95 text-neutral-100 padding px-4 py-3 text-sm shadow-lg transition-transform transform translate-y-full opacity-0 group-data-[state=show]/translate-y-0 opacity-1 transition-transform duration-300" aria-live="polite">
+    <div class="max-w-2xl mx-auto text-center">
+        <div class="flex items-center justify-center gap-3">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7a2 2 0 0 0-2 2H5a2 2 0 0 0-2 2 2 2 0 0 0 0 4 2 2 0 0 0 2 2h14a2 2 0 0 0 2-2 2 2 0 0 0 0-4z"/><polyline points="17 3 21 7 21 7"/><line points="7 21" points="3 17"/><line points="7 3" points="15 3"/></svg>
+            <span>Install Academic Hub</span>
+        </div>
+        <p class="mt-1 text-neutral-400">Get offline access to your papers and resources</p>
+        <p id="install-hint" class="hidden mt-1 text-neutral-300">Open your browser menu (⋯ or the Share icon) and choose <strong>Install app</strong> or <strong>Add to Home Screen</strong>.</p>
+        <div class="mt-3 flex gap-2">
+            <button id="install-btn" class="btn-primary">Install</button>
+            <button id="cancel-install" class="btn-secondary">Later</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // PWA Install Banner
+    let showInstallBanner = true;
+
+    // Listen for the install prompt event from the service worker
+    window.addEventListener("sw:installprompt", (e) => {
+        const event = e.detail;
+        // Show the install banner
+        const banner = document.getElementById("install-banner");
+        if (banner) {
+            banner.dataset.state = "show";
+            // Remove any existing listener to avoid duplicates
+            const newBanner = banner.cloneNode(true);
+            banner.parentNode.replaceChild(newBanner, banner);
+        }
+        // Allow showing the banner once per session
+        showInstallBanner = false;
+    });
+
+    // Handle install button click
+    document.addEventListener("click", function(e) {
+        const btn = e.target.closest ? e.target.closest("#install-btn") : null;
+        if (!btn) return;
+
+        // Hide banner
+        const banner = document.getElementById("install-banner");
+        if (banner) {
+            banner.dataset.state = "hide";
+        }
+
+        // Trigger the PWA install
+        if (window.deferredPrompt) {
+            window.deferredPrompt.prompt();
+            window.deferredPrompt.userChoice.then((choiceResult) => {
+                window.deferredPrompt = null;
+                // Accepted or dismissed — either way, stop nagging.
+                try { localStorage.setItem('arh-install-dismissed', '1'); } catch (err) {}
+            });
+        } else {
+            // No native prompt (Firefox/Safari, or Chrome hasn't fired it
+            // yet) — show manual instructions instead of doing nothing.
+            const hint = document.getElementById('install-hint');
+            if (hint) hint.classList.remove('hidden');
+        }
+    });
+
+    // Handle cancel button
+    document.addEventListener("click", function(e) {
+        const btn = e.target.closest ? e.target.closest("#cancel-install") : null;
+        if (!btn) return;
+        const banner = document.getElementById("install-banner");
+        if (banner) banner.dataset.state = "hide";
+        // Remember the dismissal — don't nag this browser again.
+        try { localStorage.setItem('arh-install-dismissed', '1'); } catch (err) {}
+    });
+
+    // Fallback: Chrome only fires beforeinstallprompt when its install
+    // heuristics pass (user engagement, not previously dismissed prompts,
+    // not already installed…). If it hasn't fired within 3 seconds of
+    // load, show our banner anyway — clicking Install without a native
+    // prompt reveals manual instructions. A real prompt that fires later
+    // simply reuses this same banner.
+    (function () {
+        let dismissed = false;
+        try { dismissed = localStorage.getItem('arh-install-dismissed') === '1'; } catch (err) {}
+        if (dismissed) return;
+        const banner = document.getElementById('install-banner');
+        if (!banner) return;
+        setTimeout(function () {
+            if (banner.dataset.state !== 'show') banner.dataset.state = 'show';
+        }, 3000);
+    })();
+
 </script>
 </body>
 </html>
