@@ -1,13 +1,13 @@
 ---
 deployment:
   tasks:
-    # Paths for this account: app lives outside the docroot, site lives in public_html
-    - export APPPATH=/home/amgacade/academic-hub
+    # Paths for this account: cPanel clones into ~/repositories, site lives in public_html
+    - export APPPATH=/home/amgacade/repositories/Academic-hub
     - export DEPLOYPATH=/home/amgacade/public_html
     # 1. Publish the web-accessible files (icons, sw.js, manifest, assets…)
     - /bin/cp -R $APPPATH/public/* $DEPLOYPATH/
-    # 2. Point public_html/index.php at the app two levels up (Option B layout)
-    - /bin/sed -i "s|__DIR__.'/../|__DIR__.'/../academic-hub/|g" $DEPLOYPATH/index.php
+    # 2. Point public_html/index.php at the app under ~/repositories (Option B layout)
+    - /bin/sed -i "s|__DIR__.'/../|__DIR__.'/../repositories/Academic-hub/|g" $DEPLOYPATH/index.php
     # 3. vendor/ is gitignored — install production dependencies on the server
     - composer install --no-dev --optimize-autoloader --no-interaction -d $APPPATH
     # 4+5. Laravel caches and schema — skipped cleanly until .env is in place
