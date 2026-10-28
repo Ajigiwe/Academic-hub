@@ -10,7 +10,5 @@ deployment:
     - /bin/sed -i "s|__DIR__.'/../|__DIR__.'/../academic-hub/|g" $DEPLOYPATH/index.php
     # 3. vendor/ is gitignored — install production dependencies on the server
     - composer install --no-dev --optimize-autoloader --no-interaction -d $APPPATH
-    # 4. Laravel caches (needs .env to exist — see DEPLOYMENT.md step 4)
-    - cd $APPPATH && php artisan config:cache && php artisan route:cache && php artisan view:cache
-    # 5. Schema — idempotent; runs only if the .env exists
-    - cd $APPPATH && php artisan migrate --force
+    # 4+5. Laravel caches and schema — skipped cleanly until .env is in place
+    - /bin/sh -c 'if [ ! -f $APPPATH/.env ]; then echo "SKIP — no .env yet — upload it, then Deploy HEAD again"; else cd $APPPATH && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force; fi'
