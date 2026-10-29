@@ -5,7 +5,9 @@ deployment:
     - export APPPATH=/home/amgacade/repositories/Academic-hub
     - export DEPLOYPATH=/home/amgacade/public_html
     # 1. Publish the web-accessible files (icons, sw.js, manifest, assets…)
-    - /bin/cp -R $APPPATH/public/* $DEPLOYPATH/
+    # NOTE: trailing /. copies DOTFILES too — a bare * glob would skip
+    # public/.htaccess and every non-root route would 404.
+    - /bin/cp -R $APPPATH/public/. $DEPLOYPATH/
     # 2. Point public_html/index.php at the app under ~/repositories (Option B layout)
     - /bin/sed -i "s|__DIR__.'/../|__DIR__.'/../repositories/Academic-hub/|g" $DEPLOYPATH/index.php
     # 3. Dependencies — this host has no composer binary, so run the vendored phar
