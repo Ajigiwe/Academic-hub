@@ -21,6 +21,12 @@
                 </p>
             @endif
 
+            @if (session('status'))
+                <div role="status" class="mt-4 rounded-lg bg-green-50 px-3.5 py-2.5 text-sm font-medium text-green-800 dark:bg-green-950/50 dark:text-green-300">
+                    {{ session('status') }}
+                </div>
+            @endif
+
             <form method="POST" action="{{ route('login.attempt') }}" class="mt-6 space-y-4">
                 @csrf
                 <div>
@@ -32,6 +38,7 @@
                     'name' => 'password',
                     'label' => 'Password',
                     'autocomplete' => 'current-password',
+                    'labelRight' => '<a href="' . route('password.request') . '" class="text-xs font-medium text-brand-700 hover:underline dark:text-brand-400">Forgot password?</a>',
                 ])
 
                 @if ($errors->any())

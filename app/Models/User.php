@@ -77,4 +77,14 @@ class User extends Authenticatable
     {
         return !empty($this->avatar);
     }
+
+    /**
+     * Send the password reset notification.
+     *
+     * @param string $token
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new \App\Notifications\ResetPasswordNotification($token));
+    }
 }

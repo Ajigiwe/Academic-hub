@@ -16,7 +16,14 @@
 @endphp
 
 <div>
-    <label for="{{ $id }}" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">{{ $label }}</label>
+    @if (isset($labelRight))
+        <div class="mb-1.5 flex items-center justify-between">
+            <label for="{{ $id }}" class="block text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">{{ $label }}</label>
+            {!! $labelRight !!}
+        </div>
+    @else
+        <label for="{{ $id }}" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">{{ $label }}</label>
+    @endif
 
     <div class="relative">
         <input id="{{ $id }}" type="password" name="{{ $name }}" required
