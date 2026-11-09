@@ -13,11 +13,15 @@
     $flowStep = $programme ? ($level ? 2 : 1) : 0;
     $stepCounts = $stepCounts ?? [];
     $typeParam = request()->query('type');
-    $isPastQuestionFlow = in_array($typeParam, ['past_question', 'unsolved'], true);
+    $modeParam = request()->query('mode');
+    $isPastQuestionFlow = in_array($typeParam, ['past_question', 'unsolved'], true) || $modeParam === 'unsolved';
 
-    $flowRoute = function (array $params = []) use ($base, $typeParam) {
+    $flowRoute = function (array $params = []) use ($base, $typeParam, $modeParam) {
         if ($typeParam !== null && $typeParam !== '') {
             $params['type'] = $typeParam;
+        }
+        if ($modeParam !== null && $modeParam !== '') {
+            $params['mode'] = $modeParam;
         }
         return route($base, $params);
     };

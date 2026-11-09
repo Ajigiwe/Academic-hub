@@ -25,6 +25,21 @@ class CatalogTest extends TestCase
         $response->assertSee('Solved past questions');
         $response->assertSee('Unsolved past questions');
         $response->assertSee('Course materials');
+        $response->assertSee('Premium');
+        $response->assertDontSee('For sale');
+    }
+
+    public function test_courses_page_supports_solved_and_unsolved_modes(): void
+    {
+        $this->seedCatalog();
+
+        $solved = $this->get('/courses?mode=solved');
+        $solved->assertOk();
+        $solved->assertSee('Solved past questions');
+
+        $unsolved = $this->get('/courses?mode=unsolved');
+        $unsolved->assertOk();
+        $unsolved->assertSee('Unsolved past questions');
     }
 
     public function test_materials_page_can_filter_for_unsolved_past_questions(): void

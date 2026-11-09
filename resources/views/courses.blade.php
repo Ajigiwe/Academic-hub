@@ -1,6 +1,14 @@
+@php
+  $pageHeading = match($mode ?? null) {
+      'solved' => 'Solved past questions',
+      'unsolved' => 'Unsolved past questions',
+      default => 'Past questions',
+  };
+@endphp
+
 @extends('layouts.app')
 
-@section('title', 'Past questions — Academic Hub')
+@section('title', $pageHeading . ' — Academic Hub')
 
 @section('content')
 <main class="flex-1">
@@ -9,7 +17,7 @@
     <nav class="text-sm text-neutral-500 dark:text-neutral-400" aria-label="Breadcrumb">
       <a href="{{ route('home') }}" class="transition-colors hover:text-brand-700 dark:hover:text-brand-300">Home</a>
       <span class="mx-1.5 text-neutral-300 dark:text-neutral-600">/</span>
-      <span class="text-neutral-700 dark:text-neutral-300">Past questions</span>
+      <span class="text-neutral-700 dark:text-neutral-300">{{ $pageHeading }}</span>
     </nav>
 
     <div class="mt-3">
@@ -17,12 +25,12 @@
         @if($guided)
           {{ $chips->implode(' · ') }}
         @else
-          Past questions
+          {{ $pageHeading }}
         @endif
       </h1>
       <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
         @if($guided)
-          {{ $bundles->count() }} course {{ Str::plural('bundle', $bundles->count()) }} for sale, plus free materials — one price unlocks every paper in a bundle.
+          {{ $bundles->count() }} course {{ Str::plural('bundle', $bundles->count()) }} available, plus free materials — one unlock gives access to every paper in a bundle.
         @else
           Tell us your programme, level, and semester — we'll show your library.
         @endif
@@ -50,8 +58,8 @@
       @if($bundles->isNotEmpty())
         {{-- Paid bundles — grouped by course (port of the original grouping) --}}
         <section class="mt-8">
-          <h2 class="text-lg font-bold tracking-tight text-neutral-900 dark:text-white">Past-question bundles for sale</h2>
-          <p class="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">Buy one bundle per course and unlock every paper inside it.</p>
+          <h2 class="text-lg font-bold tracking-tight text-neutral-900 dark:text-white">{{ $pageHeading }} bundles</h2>
+          <p class="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">Unlock a bundle for your course to access every paper inside it.</p>
           @foreach($bundles->groupBy(fn ($b) => $b->course->code ?? 'Other') as $code => $group)
             <div class="mt-6">
               <div class="flex items-baseline gap-2">

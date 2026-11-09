@@ -20,8 +20,8 @@
                 </p>
 
                 <div class="mx-auto mt-8 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-5">
-                    {{-- Door 1: Solved past questions (for sale) --}}
-                    <a href="{{ route('courses') }}" class="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-brand-500 hover:shadow-lift sm:p-7 dark:border-neutral-800 dark:bg-neutral-900">
+                    {{-- Door 1: Solved past questions (Premium) --}}
+                    <a href="{{ route('courses', ['mode' => 'solved']) }}" class="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-brand-500 hover:shadow-lift sm:p-7 dark:border-neutral-800 dark:bg-neutral-900">
                         <div class="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-brand-500/15 opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100" aria-hidden="true"></div>
                         <div>
                             <span class="relative grid h-14 w-14 place-items-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-800 text-white shadow-card ring-1 ring-white/25 transition-transform duration-200 group-hover:-rotate-3 group-hover:scale-105">
@@ -32,16 +32,16 @@
                                 </svg>
                             </span>
                             <p class="relative mt-4 text-lg font-bold text-neutral-900 dark:text-neutral-100">Solved past questions</p>
-                            <p class="relative mt-1 text-sm text-neutral-600 dark:text-neutral-400">Solved papers with step-by-step solutions &amp; answer guides — for sale.</p>
+                            <p class="relative mt-1 text-sm text-neutral-600 dark:text-neutral-400">Solved papers with step-by-step solutions &amp; answer guides — premium access.</p>
                         </div>
                         <span class="relative mt-5 flex items-center justify-between">
-                            <span class="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300">For sale</span>
+                            <span class="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300">Premium</span>
                             <span class="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 transition-transform duration-200 group-hover:translate-x-1 dark:text-brand-400" aria-hidden="true">Browse solved →</span>
                         </span>
                     </a>
 
-                    {{-- Door 2: Unsolved past questions (Separate card) --}}
-                    <a href="{{ route('materials', ['type' => 'past_question']) }}" class="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-purple-500 hover:shadow-lift sm:p-7 dark:border-neutral-800 dark:bg-neutral-900">
+                    {{-- Door 2: Unsolved past questions (Premium) --}}
+                    <a href="{{ route('courses', ['mode' => 'unsolved']) }}" class="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-purple-500 hover:shadow-lift sm:p-7 dark:border-neutral-800 dark:bg-neutral-900">
                         <div class="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-purple-500/15 opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100" aria-hidden="true"></div>
                         <div>
                             <span class="relative grid h-14 w-14 place-items-center rounded-xl bg-gradient-to-br from-purple-600 to-indigo-800 text-white shadow-card ring-1 ring-white/25 transition-transform duration-200 group-hover:rotate-3 group-hover:scale-105">
@@ -53,10 +53,10 @@
                                 </svg>
                             </span>
                             <p class="relative mt-4 text-lg font-bold text-neutral-900 dark:text-neutral-100">Unsolved past questions</p>
-                            <p class="relative mt-1 text-sm text-neutral-600 dark:text-neutral-400">Original examination papers &amp; questions by course &amp; year — practice papers.</p>
+                            <p class="relative mt-1 text-sm text-neutral-600 dark:text-neutral-400">Original examination papers &amp; questions by course &amp; year — practice packs.</p>
                         </div>
                         <span class="relative mt-5 flex items-center justify-between">
-                            <span class="inline-flex items-center rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-semibold text-purple-700 dark:bg-purple-950 dark:text-purple-300">Questions only</span>
+                            <span class="inline-flex items-center rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-semibold text-purple-700 dark:bg-purple-950 dark:text-purple-300">Premium</span>
                             <span class="inline-flex items-center gap-1 text-sm font-semibold text-purple-700 transition-transform duration-200 group-hover:translate-x-1 dark:text-purple-400" aria-hidden="true">Browse unsolved →</span>
                         </span>
                     </a>

@@ -27,8 +27,8 @@
             <label>
                 <span class="label">Type</span>
                 <select name="type" class="input text-sm">
-                    @foreach (['LECTURE_NOTES', 'SLIDES', 'REVISION', 'PRACTICE'] as $type)
-                        <option value="{{ $type }}">{{ str_replace('_', ' ', $type) }}</option>
+                    @foreach (['PAST_QUESTION' => 'Past question (unsolved)', 'LECTURE_NOTES' => 'Lecture notes', 'SLIDES' => 'Slides', 'REVISION' => 'Revision', 'PRACTICE' => 'Practice'] as $type => $label)
+                        <option value="{{ $type }}">{{ $label }}</option>
                     @endforeach
                 </select>
             </label>

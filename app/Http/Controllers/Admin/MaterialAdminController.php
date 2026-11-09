@@ -39,7 +39,7 @@ class MaterialAdminController extends Controller
         $data = $request->validate([
             'title' => ['required', 'string', 'min:6', 'max:160'],
             'description' => ['nullable', 'string', 'max:2000'],
-            'type' => ['required', Rule::in(['LECTURE_NOTES', 'SLIDES', 'REVISION', 'PRACTICE'])],
+            'type' => ['required', Rule::in(['PAST_QUESTION', 'LECTURE_NOTES', 'SLIDES', 'REVISION', 'PRACTICE'])],
             'level' => ['required', 'integer', 'min:100', 'max:400'],
             'semester' => ['required', 'integer', Rule::in([1, 2])],
             'course_code' => ['required', 'string', 'min:2', 'max:20'],

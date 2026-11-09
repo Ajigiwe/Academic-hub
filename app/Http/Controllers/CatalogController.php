@@ -27,6 +27,7 @@ class CatalogController extends Controller
     public function courses(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $mode = $request->query('mode');
         $enabled = ProgrammeSettings::enabledSlugs();
 
         // Guided browse flow — a choice is only accepted when the
@@ -49,11 +50,19 @@ class CatalogController extends Controller
         if ($guided) {
             // A bundle belongs to a semester when at least one of its
             // published papers does (port of searchBundles semantics).
-            $bundles = Bundle::published()
+            $bundlesQuery = Bundle::published()
                 ->whereIn('programme_id', Programme::whereIn('slug', $enabled)->select('id'))
                 ->where('programme_id', Programme::where('slug', $programme)->value('id'))
                 ->where('level', $level)
-                ->whereHas('resources', fn ($r) => $r->published()->where('semester', $semester))
+                ->whereHas('resources', fn ($r) => $r->published()->where('semester', $semester));
+
+            if ($mode === 'solved' && Bundle::published()->where('solved', true)->exists()) {
+                $bundlesQuery->where('solved', true);
+            } elseif ($mode === 'unsolved' && Bundle::published()->where('solved', false)->exists() && Bundle::published()->where('solved', true)->exists()) {
+                $bundlesQuery->where('solved', false);
+            }
+
+            $bundles = $bundlesQuery
                 ->with(['course', 'programme', 'resources' => fn ($r) => $r->published()])
                 ->withCount('resources')
                 ->orderBy('title')
@@ -106,6 +115,7 @@ class CatalogController extends Controller
 
         return view('courses', [
             'q' => $q,
+            'mode' => $mode,
             'programmes' => $programmes,
             'programme' => $programme,
             'level' => $level,
