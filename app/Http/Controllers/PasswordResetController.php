@@ -104,3 +104,4 @@ class PasswordResetController extends Controller
             ->withErrors(['email' => __($status)]);
     }
 }
+

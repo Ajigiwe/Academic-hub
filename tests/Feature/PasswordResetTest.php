@@ -182,3 +182,4 @@ class PasswordResetTest extends TestCase
         $response->assertSessionHasErrors('email');
     }
 }
+

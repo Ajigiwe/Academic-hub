@@ -146,7 +146,37 @@ Set this in the Paystack dashboard → *Settings → API Keys & Webhooks*. It mu
 be the live URL once you switch `PAYSTACK_SECRET_KEY` to the live key. Ensure
 `APP_URL` matches, so payment return redirects land on the right host.
 
-## 9. Automated Deploy Engine & Git Updates
+## 9. Email & SMTP Configuration (cPanel)
+
+For password reset links and student notifications, configure SMTP using your cPanel email:
+
+1. **Create an Email Account in cPanel**:
+   - Go to cPanel → **Email Accounts** → **Create**.
+   - Username: `support` (or `noreply`), e.g. `support@amgacademichub.com`.
+   - Set a strong password and save it.
+
+2. **Add Settings to your Server `.env`**:
+   In `/home/CPUSER/academic-hub/.env`, add:
+   ```env
+   MAIL_MAILER=smtp
+   MAIL_HOST=mail.amgacademichub.com
+   MAIL_PORT=465
+   MAIL_USERNAME=support@amgacademichub.com
+   MAIL_PASSWORD=your_email_password_here
+   MAIL_ENCRYPTION=ssl
+   MAIL_SCHEME=smtps
+   MAIL_FROM_ADDRESS=support@amgacademichub.com
+   MAIL_FROM_NAME="Academic Hub"
+   ```
+
+3. **Test Email Delivery**:
+   In cPanel Terminal or SSH, run:
+   ```bash
+   php artisan mail:test your_personal_email@gmail.com
+   ```
+   If configured properly, you will receive a test branded email in your inbox within seconds!
+
+## 10. Automated Deploy Engine & Git Updates
 
 You do **not** need to manually upload files or run commands over SSH for future updates. Academic Hub comes with a full **Deploy Engine**:
 

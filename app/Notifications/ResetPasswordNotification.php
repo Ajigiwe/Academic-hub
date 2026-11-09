@@ -30,10 +30,12 @@ class ResetPasswordNotification extends Notification
 
         return (new MailMessage)
             ->subject('Reset Your Academic Hub Password')
-            ->greeting("Hello {$name},")
-            ->line('You are receiving this email because we received a password reset request for your Academic Hub account.')
             ->action('Reset Password', $url)
-            ->line('This password reset link will expire in 60 minutes.')
-            ->line('If you did not request a password reset, no further action is required; your account remains secure.');
+            ->view('emails.reset-password', [
+                'name' => $name,
+                'email' => $notifiable->getEmailForPasswordReset(),
+                'url' => $url,
+            ]);
     }
 }
+

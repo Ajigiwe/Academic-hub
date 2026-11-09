@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Deployment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Process;
 use Tests\TestCase;
 
 class DeployTest extends TestCase
@@ -26,6 +27,12 @@ class DeployTest extends TestCase
             'deploy.webhook_secret' => 'test-deploy-secret-12345',
             'deploy.branch' => 'main',
             'deploy.remote' => 'origin',
+        ]);
+
+        Process::fake([
+            'git *' => Process::result('git command output'),
+            'php *' => Process::result('php command output'),
+            '*' => Process::result(''),
         ]);
     }
 
