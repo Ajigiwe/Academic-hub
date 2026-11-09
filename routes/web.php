@@ -1,9 +1,10 @@
 <?php
 
-use App\Http\Controllers\Admin\{AdminController, BundleAdminController, MaterialAdminController, OrderAdminController, PaperAdminController, SettingsAdminController, StudentAdminController};
+use App\Http\Controllers\Admin\{AdminController, BundleAdminController, DeployAdminController, MaterialAdminController, OrderAdminController, PaperAdminController, SettingsAdminController, StudentAdminController};
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\DeployWebhookController;
 use App\Http\Controllers\FavouriteController;
 use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\MaterialsController;
@@ -71,6 +72,9 @@ Route::get('/payments/verify/{reference?}', PaymentVerifyController::class)
 // Provider webhook (server-to-server, CSRF-exempt — see bootstrap/app.php).
 Route::post('/payments/webhook', PaymentWebhookController::class)->name('payments.webhook');
 
+// Git push deployment webhook (server-to-server, CSRF-exempt — see bootstrap/app.php).
+Route::post('/deploy/webhook', [DeployWebhookController::class, 'handle'])->name('deploy.webhook');
+
 // Browser return landing page (port of Next.js /payment/result): the
 // receipt, or an honest account of why there is none. Details are shown
 // only to the student who owns the order (see PaymentResultController).
@@ -135,4 +139,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/settings/{programme}/toggle', [SettingsAdminController::class, 'toggle'])->name('settings.toggle');
     Route::post('/settings/{programme}/rename', [SettingsAdminController::class, 'rename'])->name('settings.rename');
     Route::delete('/settings/{programme}', [SettingsAdminController::class, 'destroy'])->name('settings.destroy');
+
+    // Deploy Engine
+    Route::get('/deploy', [DeployAdminController::class, 'index'])->name('deploy');
+    Route::post('/deploy/check', [DeployAdminController::class, 'checkUpdates'])->name('deploy.check');
+    Route::post('/deploy/run', [DeployAdminController::class, 'runDeploy'])->name('deploy.run');
+    Route::post('/deploy/cache', [DeployAdminController::class, 'clearCache'])->name('deploy.cache');
+    Route::post('/deploy/maintenance', [DeployAdminController::class, 'toggleMaintenance'])->name('deploy.maintenance');
+    Route::get('/deploy/log/{deployment}', [DeployAdminController::class, 'showLog'])->name('deploy.log');
 });

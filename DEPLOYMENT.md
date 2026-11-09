@@ -146,19 +146,36 @@ Set this in the Paystack dashboard → *Settings → API Keys & Webhooks*. It mu
 be the live URL once you switch `PAYSTACK_SECRET_KEY` to the live key. Ensure
 `APP_URL` matches, so payment return redirects land on the right host.
 
-## 9. Updating a deployment
+## 9. Automated Deploy Engine & Git Updates
 
-1. Repeat step 1 locally (or run it on the server if it has Composer + SSH).
-2. Upload changed files (or the whole tree, excluding `.env`).
-3. On the server:
-   ```bash
-   php artisan migrate --force   # only if there are new migrations
-   php artisan config:cache && php artisan route:cache && php artisan view:cache
-   ```
-4. If PHP OPcache is enabled and changes don't appear, hit
-   `https://yourdomain.com/opcache-reset.php?token=YOUR_TOKEN` (set the token
-   inside the file first — see the comment at its top — then delete the file
-   if you don't want it around).
+You do **not** need to manually upload files or run commands over SSH for future updates. Academic Hub comes with a full **Deploy Engine**:
+
+### Method A — 1-Click Deploy via Admin Panel
+1. Log in to the Admin Panel (`https://yourdomain.com/admin/deploy`).
+2. Click **"Check for Updates"** to inspect incoming commits from GitHub.
+3. Click **"Deploy to Production Now"**.
+4. The server pulls `origin/main`, runs migrations, optimizes caches (`config:cache`, `route:cache`, `view:cache`), copies updated public assets to `public_html`, and flushes OPcache.
+5. Real-time console logs and deployment history are saved and visible in the dashboard.
+
+### Method B — Automatic Push-to-Deploy (GitHub Webhooks)
+Every time you push code to GitHub (`git push origin main`), GitHub can automatically notify your live server to pull and deploy:
+1. Go to your GitHub repository → **Settings** → **Webhooks** → **Add webhook**.
+2. **Payload URL**: `https://yourdomain.com/deploy/webhook`
+3. **Content type**: `application/json`
+4. **Secret**: Value of `DEPLOY_WEBHOOK_SECRET` in your server's `.env`.
+5. **Which events**: "Just the push event".
+6. Click **Add webhook**. Every push to `main` now automatically updates the live server in seconds!
+
+### Method C — CLI / Cron Job
+You can also run the deploy engine via SSH or cPanel cron:
+```bash
+php artisan deploy:run
+# Options: --quick (skip composer), --maintenance (put app in maintenance during deploy)
+```
+
+---
+
+## 10. Updating a deployment manually (fallback)
 
 ## Troubleshooting
 

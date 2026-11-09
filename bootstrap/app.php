@@ -16,10 +16,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'sandbox' => \App\Http\Middleware\SandboxGatewayOnly::class,
         ]);
 
-        // The provider webhook is server-to-server and carries its own
-        // HMAC signature — CSRF tokens don't apply to it.
+        // Provider & deployment webhooks are server-to-server and carry their own
+        // signatures / tokens — CSRF tokens don't apply to them.
         $middleware->validateCsrfTokens(except: [
             'payments/webhook',
+            'deploy/webhook',
+        ]);
+
+        // Keep admin routes and deploy webhook reachable during maintenance
+        $middleware->preventRequestsDuringMaintenance(except: [
+            'admin/*',
+            'deploy/webhook',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
