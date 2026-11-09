@@ -13,6 +13,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentResultController;
 use App\Http\Controllers\PaymentVerifyController;
 use App\Http\Controllers\PaymentWebhookController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\ViewerController;
 use Illuminate\Support\Facades\Route;
@@ -92,6 +93,18 @@ Route::get('/favourites', [FavouriteController::class, 'index'])
     ->middleware('auth')->name('favourites.index');
 Route::post('/favourites/{resource}', [FavouriteController::class, 'toggle'])
     ->middleware('auth')->name('favourites.toggle');
+
+// ── User profile & account management ────────────────────────────────
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'show'])->name('profile');
+    Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
+    Route::delete('/profile/avatar', [ProfileController::class, 'destroyAvatar'])->name('profile.avatar.destroy');
+    Route::post('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+});
+
+// Avatar asset endpoint (serves uploaded photo or dynamic initials SVG)
+Route::get('/avatar/{user}', [ProfileController::class, 'avatar'])->name('avatar');
 
 // ── Secure viewer ────────────────────────────────────────────────────
 Route::get('/view/{slug}', [ViewerController::class, 'show'])

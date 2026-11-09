@@ -178,8 +178,8 @@
                         <span class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[10px] font-bold text-white">{{ $unread > 9 ? '9+' : $unread }}</span>
                     @endif
                 </a>
-                <a href="#" class="flex items-center gap-2 rounded-full border border-neutral-200 bg-white py-1 pl-1 pr-3 shadow-sm transition hover:border-brand-300 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:border-brand-600">
-                    <span class="grid h-7 w-7 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-800 dark:bg-brand-900 dark:text-brand-300">{{ mb_strtoupper(mb_substr(auth()->user()->first_name ?? auth()->user()->name ?? 'S', 0, 1)) }}</span>
+                <a href="{{ route('profile') }}" class="flex items-center gap-2 rounded-full border border-neutral-200 bg-white py-1 pl-1 pr-3 shadow-sm transition hover:border-brand-300 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:border-brand-600" title="Manage your account">
+                    <img src="{{ auth()->user()->avatar_url }}" alt="{{ auth()->user()->name }}" class="h-7 w-7 rounded-full object-cover">
                     <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">{{ auth()->user()->first_name ?? auth()->user()->name ?? 'Account' }}</span>
                 </a>
                 <form method="POST" action="{{ route('logout') }}">
@@ -205,6 +205,9 @@
                     @if ($unread > 0)
                         <span class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[10px] font-bold text-white">{{ $unread > 9 ? '9+' : $unread }}</span>
                     @endif
+                </a>
+                <a href="{{ route('profile') }}" aria-label="Profile" class="grid h-8 w-8 place-items-center overflow-hidden rounded-full border border-neutral-200 dark:border-neutral-700">
+                    <img src="{{ auth()->user()->avatar_url }}" alt="{{ auth()->user()->name }}" class="h-full w-full object-cover">
                 </a>
             @else
                 <a href="{{ route('login') }}" class="btn-primary btn-sm">Log in</a>
@@ -238,7 +241,8 @@
                 if (auth()->user()->isAdmin()) {
                     $mobileItems[] = ['href' => route('admin.dashboard'), 'label' => 'Admin', 'match' => request()->is('admin*'), 'icon' => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>'];
                 }
-                $mobileItems[] = ['href' => route('favourites.index'), 'label' => 'Saved', 'match' => request()->is('favourites*'), 'icon' => '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'];
+                $mobileItems[] = ['href' => route('favourites.index'), 'label' => 'Saved', 'match' => request()->is('favourites*'), 'icon' => '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>'];
+                $mobileItems[] = ['href' => route('profile'), 'label' => 'Profile', 'match' => request()->is('profile*'), 'icon' => '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'];
             } else {
                 $mobileItems[] = ['href' => route('login'), 'label' => 'Log in', 'match' => request()->is('login*'), 'icon' => '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/>'];
             }
