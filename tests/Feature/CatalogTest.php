@@ -14,7 +14,7 @@ class CatalogTest extends TestCase
         $this->seed(\Database\Seeders\PastqSeeder::class);
     }
 
-    public function test_home_is_the_hero_with_two_intent_doors(): void
+    public function test_home_is_the_hero_with_three_intent_cards(): void
     {
         $this->seedCatalog();
 
@@ -22,8 +22,22 @@ class CatalogTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Find the Past Questions');
-        $response->assertSee('Past questions');
+        $response->assertSee('Solved past questions');
+        $response->assertSee('Unsolved past questions');
         $response->assertSee('Course materials');
+    }
+
+    public function test_materials_page_can_filter_for_unsolved_past_questions(): void
+    {
+        $this->seedCatalog();
+
+        $response = $this->get('/materials?type=past_question');
+        $response->assertOk();
+        $response->assertSee('Unsolved past questions');
+
+        $guidedResponse = $this->get('/materials?type=past_question&programme=accounting&level=100&semester=1');
+        $guidedResponse->assertOk();
+        $guidedResponse->assertSee('Looking for solved past questions instead?');
     }
 
     public function test_courses_page_lists_published_bundles(): void

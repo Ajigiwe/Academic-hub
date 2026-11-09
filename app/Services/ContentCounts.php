@@ -25,7 +25,7 @@ class ContentCounts
      * Level cards for a programme: [100 => ['bundles' => n, 'materials' => n], ...].
      * Pass withMaterials: false on materials-only pages (and vice versa).
      */
-    public static function levelCards(?int $programmeId, bool $withBundles = true, bool $withMaterials = true): array
+    public static function levelCards(?int $programmeId, bool $withBundles = true, bool $withMaterials = true, ?string $resourceType = null): array
     {
         if (! $programmeId) {
             return [];
@@ -35,7 +35,7 @@ class ContentCounts
             ? self::groupedBy(self::publishedBundles($programmeId), 'level')
             : [];
         $materials = $withMaterials
-            ? self::groupedBy(self::freeMaterials($programmeId), 'level')
+            ? self::groupedBy(self::freeMaterials($programmeId, $resourceType), 'level')
             : [];
 
         $cards = [];
@@ -50,7 +50,7 @@ class ContentCounts
     }
 
     /** Semester cards for a programme + level: [1 => [...], 2 => [...]]. */
-    public static function semesterCards(?int $programmeId, ?int $level, bool $withBundles = true, bool $withMaterials = true): array
+    public static function semesterCards(?int $programmeId, ?int $level, bool $withBundles = true, bool $withMaterials = true, ?string $resourceType = null): array
     {
         if (! $programmeId || ! $level) {
             return [];
@@ -71,7 +71,7 @@ class ContentCounts
 
         $materials = [];
         if ($withMaterials) {
-            $materials = self::groupedBy(self::freeMaterials($programmeId)->where('level', $level), 'semester');
+            $materials = self::groupedBy(self::freeMaterials($programmeId, $resourceType)->where('level', $level), 'semester');
         }
 
         $cards = [];
@@ -94,11 +94,12 @@ class ContentCounts
     }
 
     /** Published resources that belong to no bundle — the free library. */
-    private static function freeMaterials(int $programmeId)
+    private static function freeMaterials(int $programmeId, ?string $resourceType = null)
     {
         return Resource::published()
             ->whereNull('bundle_id')
-            ->where('programme_id', $programmeId);
+            ->where('programme_id', $programmeId)
+            ->when($resourceType !== null, fn ($q) => $q->where('type', $resourceType));
     }
 
     /**

@@ -24,6 +24,10 @@ class MaterialsController extends Controller
     {
         $enabled = ProgrammeSettings::enabledSlugs();
 
+        $type = $request->query('type');
+        $isPastQuestionOnly = in_array($type, ['past_question', 'unsolved'], true);
+        $resourceType = $isPastQuestionOnly ? 'PAST_QUESTION' : null;
+
         // A choice is only accepted when the programme is admin-enabled.
         $programme = in_array($request->query('programme'), $enabled, true)
             ? (string) $request->query('programme')
@@ -38,7 +42,7 @@ class MaterialsController extends Controller
         $guided = $programme !== null && $level !== null && $semester !== null;
 
         $materials = $guided
-            ? $this->materialQuery($programme, $level, $semester, $enabled)->get()
+            ? $this->materialQuery($programme, $level, $semester, $enabled, $resourceType)->get()
             : collect();
 
         // Per-programme content counts for the step-1 programme cards:
@@ -48,7 +52,9 @@ class MaterialsController extends Controller
             ->withCount([
                 'bundles as published_bundles_count' => fn ($q) => $q->published(),
                 'resources as published_materials_count' => fn ($q) => $q
-                    ->where('status', 'PUBLISHED')->whereNull('bundle_id'),
+                    ->where('status', 'PUBLISHED')
+                    ->whereNull('bundle_id')
+                    ->when($resourceType !== null, fn ($sub) => $sub->where('type', $resourceType)),
             ])
             ->orderBy('name')
             ->get()
@@ -65,9 +71,9 @@ class MaterialsController extends Controller
         $stepCounts = [];
         if ($programme !== null) {
             $programmeId = Programme::where('slug', $programme)->value('id');
-            $stepCounts['level'] = ContentCounts::levelCards($programmeId, withBundles: false);
+            $stepCounts['level'] = ContentCounts::levelCards($programmeId, withBundles: false, resourceType: $resourceType);
             if ($level !== null) {
-                $stepCounts['semester'] = ContentCounts::semesterCards($programmeId, $level, withBundles: false);
+                $stepCounts['semester'] = ContentCounts::semesterCards($programmeId, $level, withBundles: false, resourceType: $resourceType);
             }
         }
 
@@ -76,6 +82,7 @@ class MaterialsController extends Controller
             'programme' => $programme,
             'level' => $level,
             'semester' => $semester,
+            'type' => $type,
             'guided' => $guided,
             'chips' => collect([
                 $programme ? Programme::shortName($programme) : null,
@@ -128,7 +135,7 @@ class MaterialsController extends Controller
         ]);
     }
 
-    private function materialQuery(string $programme, int $level, int $semester, array $enabled)
+    private function materialQuery(string $programme, int $level, int $semester, array $enabled, ?string $resourceType = null)
     {
         return Resource::published()
             ->whereNull('bundle_id')
@@ -136,6 +143,7 @@ class MaterialsController extends Controller
             ->where('programme_id', Programme::where('slug', $programme)->value('id'))
             ->where('level', $level)
             ->where('semester', $semester)
+            ->when($resourceType !== null, fn ($q) => $q->where('resources.type', $resourceType))
             ->with(['course', 'programme', 'files' => fn ($q) => $q
                 ->where('is_current', true)])
             // Port of the getFreeMaterials ordering. Explicit select so

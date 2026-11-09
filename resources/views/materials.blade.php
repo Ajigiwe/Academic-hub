@@ -1,6 +1,11 @@
+@php
+  $isPastQuestion = in_array($type ?? request('type'), ['past_question', 'unsolved'], true);
+  $sectionTitle = $isPastQuestion ? 'Unsolved past questions' : 'Course materials';
+@endphp
+
 @extends('layouts.app')
 
-@section('title', 'Course materials — Academic Hub')
+@section('title', $sectionTitle . ' — Academic Hub')
 
 @section('content')
 <main class="flex-1">
@@ -9,7 +14,7 @@
     <nav class="text-sm text-neutral-500 dark:text-neutral-400" aria-label="Breadcrumb">
       <a href="{{ route('home') }}" class="transition-colors hover:text-brand-700 dark:hover:text-brand-300">Home</a>
       <span class="mx-1.5 text-neutral-300 dark:text-neutral-600">/</span>
-      <span class="text-neutral-700 dark:text-neutral-300">Course materials</span>
+      <span class="text-neutral-700 dark:text-neutral-300">{{ $sectionTitle }}</span>
     </nav>
 
     <div class="mt-3">
@@ -17,14 +22,22 @@
         @if($guided)
           {{ $chips->implode(' · ') }}
         @else
-          Course materials
+          {{ $sectionTitle }}
         @endif
       </h1>
       <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
         @if($guided)
-          {{ $materials->count() }} free download{{ Str::plural('', $materials->count()) }} for your selection — slides, lecture notes, and revision packs.
+          @if($isPastQuestion)
+            {{ $materials->count() }} unsolved question paper{{ Str::plural('', $materials->count()) }} for your selection — original examination questions for revision.
+          @else
+            {{ $materials->count() }} free download{{ Str::plural('', $materials->count()) }} for your selection — slides, lecture notes, and revision packs.
+          @endif
         @else
-          Tell us your programme, level, and semester — we'll show your library.
+          @if($isPastQuestion)
+            Tell us your programme, level, and semester — we'll show original unsolved exam papers.
+          @else
+            Tell us your programme, level, and semester — we'll show your library.
+          @endif
         @endif
       </p>
     </div>
@@ -37,12 +50,18 @@
     @if($guided)
       @if($materials->isEmpty())
         <div class="card-padded mt-6 py-12 text-center">
-          <p class="font-medium text-neutral-800 dark:text-neutral-100">No materials for this selection yet</p>
+          <p class="font-medium text-neutral-800 dark:text-neutral-100">
+            {{ $isPastQuestion ? 'No unsolved past questions for this selection yet' : 'No materials for this selection yet' }}
+          </p>
           <p class="mx-auto mt-1 max-w-md text-sm text-neutral-600 dark:text-neutral-300">
-            Slides and notes for {{ $chips->implode(' · ') }} are being prepared — check back soon, or look at past questions instead.
+            @if($isPastQuestion)
+              Unsolved question papers for {{ $chips->implode(' · ') }} are being prepared — check back soon, or view solved past questions instead.
+            @else
+              Slides and notes for {{ $chips->implode(' · ') }} are being prepared — check back soon, or look at past questions instead.
+            @endif
           </p>
           <div class="mt-5 flex flex-wrap justify-center gap-3">
-            <a href="{{ route('courses') }}" class="btn-primary">Looking for past questions instead?</a>
+            <a href="{{ route('courses') }}" class="btn-primary">Looking for solved past questions instead?</a>
           </div>
         </div>
       @else
@@ -53,7 +72,9 @@
               <div class="mb-3 flex flex-wrap items-center gap-1.5">
                 <span class="badge-brand">{{ $m->course->code ?? 'Material' }}</span>
                 <span class="badge-neutral">{{ $m->typeLabel() }}</span>
-                <span class="badge-gold">Free</span>
+                <span class="{{ $m->type === 'PAST_QUESTION' ? 'badge-brand' : 'badge-gold' }}">
+                  {{ $m->type === 'PAST_QUESTION' ? 'Question paper' : 'Free' }}
+                </span>
               </div>
               <h3 class="font-display text-base font-semibold leading-snug text-neutral-900 dark:text-white">{{ $m->title }}</h3>
               <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
@@ -66,7 +87,7 @@
                 </span>
                 <a href="{{ route('materials.download', ['slug' => $m->slug]) }}"
                    class="btn-primary inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white">
-                  Download
+                  {{ $m->type === 'PAST_QUESTION' ? 'Download paper' : 'Download' }}
                 </a>
               </div>
             </article>
@@ -77,7 +98,7 @@
       <div class="card-padded mt-6 py-12 text-center">
         <p class="font-medium text-neutral-800 dark:text-neutral-100">Complete the three steps above</p>
         <p class="mx-auto mt-1 max-w-md text-sm text-neutral-600 dark:text-neutral-300">
-          Your programme, level, and semester — then the free materials library opens.
+          Your programme, level, and semester — then the {{ $isPastQuestion ? 'unsolved past questions' : 'free materials' }} library opens.
         </p>
       </div>
     @endif

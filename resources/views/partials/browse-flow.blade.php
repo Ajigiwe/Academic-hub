@@ -12,20 +12,30 @@
 @php
     $flowStep = $programme ? ($level ? 2 : 1) : 0;
     $stepCounts = $stepCounts ?? [];
+    $typeParam = request()->query('type');
+    $isPastQuestionFlow = in_array($typeParam, ['past_question', 'unsolved'], true);
+
+    $flowRoute = function (array $params = []) use ($base, $typeParam) {
+        if ($typeParam !== null && $typeParam !== '') {
+            $params['type'] = $typeParam;
+        }
+        return route($base, $params);
+    };
 
     // "2 bundles · 1 free material" for a card, or "Nothing here yet"
     // when that selection holds no openable content. Null = this page
     // doesn't report counts for that step at all.
-    $countLine = function (string $step, int $value) use ($stepCounts) {
+    $countLine = function (string $step, int $value) use ($stepCounts, $isPastQuestionFlow) {
         $counts = $stepCounts[$step][$value] ?? null;
         if ($counts === null) {
             return null;
         }
         $bundles = (int) ($counts['bundles'] ?? 0);
         $materials = (int) ($counts['materials'] ?? 0);
+        $matLabel = $isPastQuestionFlow ? 'unsolved paper' : 'free material';
         $parts = collect([
             $bundles > 0 ? $bundles.' '.Str::plural('bundle', $bundles) : null,
-            $materials > 0 ? $materials.' free '.Str::plural('material', $materials) : null,
+            $materials > 0 ? $materials.' '.Str::plural($matLabel, $materials) : null,
         ])->filter();
 
         return [
@@ -79,7 +89,7 @@
             <div class="mt-4 grid gap-3 {{ $programmes->count() === 1 ? 'sm:max-w-md' : ($programmes->count() === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3') }}">
                 @foreach ($programmes as $p)
                     @php $hasContent = $p['bundles'] > 0 || $p['materials'] > 0; @endphp
-                    <a href="{{ route($base, ['programme' => $p['slug']]) }}"
+                    <a href="{{ $flowRoute(['programme' => $p['slug']]) }}"
                        class="group relative flex flex-col rounded-2xl border border-neutral-200 bg-white p-4 text-left transition duration-150 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-brand-500">
                         <span class="flex items-start justify-between gap-2">
                             <span class="inline-block rounded-md bg-neutral-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{{ $p['slug'] }}</span>
@@ -90,7 +100,10 @@
                             <span class="h-1.5 w-1.5 shrink-0 rounded-full {{ $hasContent ? 'bg-emerald-500' : 'bg-neutral-300 dark:bg-neutral-600' }}" aria-hidden="true"></span>
                             <span>
                                 @if ($hasContent)
-                                    {{ collect([$p['bundles'] > 0 ? $p['bundles'].' '.Str::plural('bundle', $p['bundles']) : null, $p['materials'] > 0 ? $p['materials'].' free '.Str::plural('material', $p['materials']) : null])->filter()->implode(' · ') }}
+                                    @php
+                                        $matLabel = $isPastQuestionFlow ? 'unsolved paper' : 'free material';
+                                    @endphp
+                                    {{ collect([$p['bundles'] > 0 ? $p['bundles'].' '.Str::plural('bundle', $p['bundles']) : null, $p['materials'] > 0 ? $p['materials'].' '.Str::plural($matLabel, $p['materials']) : null])->filter()->implode(' · ') }}
                                 @else
                                     No content yet
                                 @endif
@@ -111,7 +124,7 @@
             <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 @foreach (\App\Models\Programme::LEVELS as $l)
                     @php $line = $countLine('level', $l); @endphp
-                    <a href="{{ route($base, ['programme' => $programme, 'level' => $l]) }}"
+                    <a href="{{ $flowRoute(['programme' => $programme, 'level' => $l]) }}"
                        class="group relative flex flex-col rounded-2xl border p-4 transition duration-150 hover:-translate-y-0.5 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 {{ $line && $line['empty'] ? 'border-neutral-200 border-dashed bg-neutral-50/60 hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900/40 dark:hover:border-neutral-700' : 'border-neutral-200 bg-white hover:border-brand-300 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-brand-500' }}">
                         <span class="flex items-start justify-between gap-2">
                             <span class="font-display text-2xl font-bold leading-none tracking-tight {{ $line && $line['empty'] ? 'text-neutral-400 dark:text-neutral-500' : 'text-neutral-900 dark:text-white' }}">{{ $l }}</span>
@@ -139,7 +152,7 @@
             <div class="mt-4 grid grid-cols-2 gap-3 sm:max-w-md">
                 @foreach ($semesters as $s)
                     @php $line = $countLine('semester', $s['value']); @endphp
-                    <a href="{{ route($base, ['programme' => $programme, 'level' => $level, 'semester' => $s['value']]) }}"
+                    <a href="{{ $flowRoute(['programme' => $programme, 'level' => $level, 'semester' => $s['value']]) }}"
                        class="group relative flex flex-col rounded-2xl border p-4 transition duration-150 hover:-translate-y-0.5 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 {{ $line && $line['empty'] ? 'border-neutral-200 border-dashed bg-neutral-50/60 hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900/40 dark:hover:border-neutral-700' : 'border-neutral-200 bg-white hover:border-brand-300 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-brand-500' }}">
                         <span class="flex items-start justify-between gap-2">
                             <span class="text-sm font-bold {{ $line && $line['empty'] ? 'text-neutral-500 dark:text-neutral-400' : 'text-neutral-900 dark:text-white' }}">{{ $s['label'] }}</span>
@@ -165,7 +178,7 @@
                 {{ $programmes->count() }} {{ Str::plural('programme', $programmes->count()) }} available
             </span>
         @else
-            <a href="{{ route($base) }}" class="btn-secondary">← Back</a>
+            <a href="{{ $flowRoute([]) }}" class="btn-secondary">← Back</a>
         @endif
     </div>
 </div>
