@@ -198,10 +198,23 @@ class SettingsAdminController extends Controller
      */
     public function clearConfigCache()
     {
+        $cachedConfig = app()->getCachedConfigPath();
+
+        if (function_exists('opcache_invalidate') && file_exists($cachedConfig)) {
+            @opcache_invalidate($cachedConfig, true);
+        }
+
         Artisan::call('config:clear');
 
         if (function_exists('opcache_reset')) {
             @opcache_reset();
+        }
+
+        if (file_exists($cachedConfig)) {
+            return back()->with(
+                'error',
+                "Could not remove {$cachedConfig} — ensure bootstrap/cache is writable (755 or 775) in cPanel File Manager, or delete config.php there directly.",
+            );
         }
 
         return back()->with('status', 'Config cache cleared — Laravel is now reading fresh values from .env.');
@@ -218,20 +231,37 @@ class SettingsAdminController extends Controller
         ]);
 
         $recipient = trim($data['test_email']);
+        $snapshot = $mailStatus->status();
         $result = $mailStatus->sendTest($recipient, $request->user()?->email);
 
         if ($result['ok']) {
-            $message = $result['is_local_only']
-                ? sprintf(
-                    'Test email written to storage/logs/laravel.log for %s (MAIL_MAILER is "%s" — update .env to "smtp" and click "Reload .env config" to deliver to real inboxes).',
-                    $recipient,
-                    $result['mailer'],
-                )
-                : sprintf(
+            if ($result['is_local_only']) {
+                $message = $snapshot['config_cached']
+                    ? sprintf(
+                        'Test email written to storage/logs/laravel.log for %s because cached config still holds MAIL_MAILER="%s" — click "Reload .env config" in the Email & SMTP card first.',
+                        $recipient,
+                        $result['mailer'],
+                    )
+                    : ($snapshot['env_mailer'] === 'smtp'
+                        ? sprintf(
+                            'Test email written to storage/logs/laravel.log for %s — %s sets MAIL_MAILER="smtp", but PHP runtime still sees "%s". Check the Email & SMTP card diagnostics below.',
+                            $recipient,
+                            $snapshot['env_path'],
+                            $result['mailer'],
+                        )
+                        : sprintf(
+                            'Test email written to storage/logs/laravel.log for %s (MAIL_MAILER is "%s" — update %s to "smtp" and click "Reload .env config" to deliver to real inboxes).',
+                            $recipient,
+                            $result['mailer'],
+                            $snapshot['env_path'],
+                        ));
+            } else {
+                $message = sprintf(
                     'Test email sent to %s via %s — check the inbox (and spam folder).',
                     $recipient,
                     $result['mailer'],
                 );
+            }
 
             return back()->withInput()->with('status', $message);
         }

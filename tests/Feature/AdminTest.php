@@ -533,6 +533,49 @@ class AdminTest extends TestCase
         Mail::assertSent(TestEmail::class, fn (TestEmail $mail) => $mail->hasTo('cli@example.com'));
     }
 
+    public function test_mail_status_detects_duplicate_mail_keys_and_env_mailer(): void
+    {
+        config(['mail.default' => 'log']);
+
+        $tmpEnv = tempnam(sys_get_temp_dir(), 'ah_env_');
+        file_put_contents($tmpEnv, implode("\n", [
+            'MAIL_MAILER=log',
+            'MAIL_HOST=127.0.0.1',
+            'MAIL_MAILER=smtp',
+            'MAIL_HOST=mail.amgacademichub.com',
+        ]));
+
+        try {
+            $status = (new \App\Services\MailStatus)->status($tmpEnv);
+
+            $this->assertTrue($status['env_exists']);
+            $this->assertTrue($status['env_parse_ok']);
+            $this->assertSame('smtp', $status['env_mailer']);
+            $this->assertContains('MAIL_MAILER (lines 1, 3)', $status['duplicate_mail_keys']);
+            $this->assertContains('MAIL_HOST (lines 2, 4)', $status['duplicate_mail_keys']);
+            $this->assertStringContainsString('already sets MAIL_MAILER="smtp"', (string) $status['note']);
+        } finally {
+            @unlink($tmpEnv);
+        }
+    }
+
+    public function test_mail_status_flags_invalid_env_syntax_without_leaking_secrets(): void
+    {
+        $tmpEnv = tempnam(sys_get_temp_dir(), 'ah_badenv_');
+        file_put_contents($tmpEnv, "SECRET_TOKEN=\"unclosed-secret-value\nMAIL_MAILER=smtp\n");
+
+        try {
+            $status = (new \App\Services\MailStatus)->status($tmpEnv);
+
+            $this->assertTrue($status['env_exists']);
+            $this->assertFalse($status['env_parse_ok']);
+            $this->assertStringContainsString('syntax error', (string) $status['note']);
+            $this->assertStringNotContainsString('unclosed-secret-value', (string) $status['note']);
+        } finally {
+            @unlink($tmpEnv);
+        }
+    }
+
     private function makePdfBytes(): string
     {
         $pdf = new \setasign\Fpdi\Tcpdf\Fpdi('P', 'pt', 'A4', true, 'UTF-8', false);

@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Mail\TestEmail;
+use Dotenv\Dotenv;
+use Dotenv\Exception\InvalidFileException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
@@ -32,10 +34,15 @@ class MailStatus
      *     from_name: string,
      *     config_cached: bool,
      *     smtp_ready: bool,
+     *     env_path: string,
+     *     env_exists: bool,
+     *     env_parse_ok: bool,
+     *     env_mailer: ?string,
+     *     duplicate_mail_keys: list<string>,
      *     note: ?string
      * }
      */
-    public function status(): array
+    public function status(?string $envPathOverride = null): array
     {
         $mailer = (string) (config('mail.default') ?: 'log');
         $isLocalOnly = in_array($mailer, ['log', 'array'], true);
@@ -59,6 +66,7 @@ class MailStatus
         $fromAddress = trim((string) config('mail.from.address', ''));
         $fromName = trim((string) config('mail.from.name', config('app.name', 'Academic Hub')));
         $configCached = app()->configurationIsCached();
+        $envInfo = $this->inspectEnvFile($envPathOverride);
 
         $smtpReady = $mailer === 'smtp'
             && $host !== ''
@@ -67,10 +75,29 @@ class MailStatus
             && $passwordSet;
 
         $note = null;
-        if ($isLocalOnly) {
+        if ($envInfo['env_exists'] && ! $envInfo['env_parse_ok']) {
             $note = sprintf(
-                'Mailer is set to "%s", so emails (including password resets) are written to storage/logs/laravel.log instead of being delivered to inboxes. Update MAIL_* values in .env via cPanel File Manager, then click "Reload .env config" below.',
+                'Your active environment file (%s) has a syntax error (such as an unquoted space or unclosed quote), so Laravel may not be reading all MAIL_* values. Fix it in cPanel File Manager and click "Reload .env config".',
+                $envInfo['env_path'],
+            );
+        } elseif ($configCached && $envInfo['env_mailer'] !== null && $envInfo['env_mailer'] !== $mailer) {
+            $note = sprintf(
+                'Config cache is overriding .env: %s sets MAIL_MAILER="%s", but cached config is still using "%s". Click "Reload .env config" in the top-right corner of this card.',
+                $envInfo['env_path'],
+                $envInfo['env_mailer'],
                 $mailer,
+            );
+        } elseif ($isLocalOnly && $envInfo['env_mailer'] === 'smtp') {
+            $note = sprintf(
+                '%s already sets MAIL_MAILER="smtp", but PHP runtime still sees "%s". Click "Reload .env config" above, check whether you have another .env folder on the server, or check for an external environment variable.',
+                $envInfo['env_path'],
+                $mailer,
+            );
+        } elseif ($isLocalOnly) {
+            $note = sprintf(
+                'Mailer is set to "%s", so emails (including password resets and order receipts) are written to storage/logs/laravel.log instead of being delivered to inboxes. Update MAIL_* values in %s via cPanel File Manager, then click "Reload .env config".',
+                $mailer,
+                $envInfo['env_path'],
             );
         } elseif ($mailer === 'smtp' && ! $smtpReady) {
             $missing = [];
@@ -103,6 +130,11 @@ class MailStatus
             'from_name' => $fromName,
             'config_cached' => $configCached,
             'smtp_ready' => $smtpReady,
+            'env_path' => $envInfo['env_path'],
+            'env_exists' => $envInfo['env_exists'],
+            'env_parse_ok' => $envInfo['env_parse_ok'],
+            'env_mailer' => $envInfo['env_mailer'],
+            'duplicate_mail_keys' => $envInfo['duplicate_mail_keys'],
             'note' => $note,
         ];
     }
@@ -184,6 +216,98 @@ class MailStatus
         }
 
         return $tips;
+    }
+
+    /**
+     * Inspect the active .env file for common cPanel mistakes (wrong folder,
+     * duplicate MAIL_* blocks, or Dotenv syntax errors) without ever returning secrets.
+     *
+     * @return array{
+     *     env_path: string,
+     *     env_exists: bool,
+     *     env_parse_ok: bool,
+     *     env_mailer: ?string,
+     *     duplicate_mail_keys: list<string>
+     * }
+     */
+    private function inspectEnvFile(?string $envPathOverride = null): array
+    {
+        $envPath = $envPathOverride ?: app()->environmentFilePath();
+
+        if (! is_file($envPath) || ! is_readable($envPath)) {
+            return [
+                'env_path' => $envPath,
+                'env_exists' => is_file($envPath),
+                'env_parse_ok' => false,
+                'env_mailer' => null,
+                'duplicate_mail_keys' => [],
+            ];
+        }
+
+        $raw = (string) file_get_contents($envPath);
+        $parseOk = true;
+        $parsedKeys = [];
+        try {
+            $parsedKeys = Dotenv::parse($raw);
+        } catch (InvalidFileException) {
+            $parseOk = false;
+        }
+
+        $lines = preg_split("/\r\n|\n|\r/", $raw) ?: [];
+        $mailKeyLines = [];
+        $envMailer = null;
+
+        foreach ($lines as $idx => $line) {
+            $trimmed = ltrim($line);
+            if ($trimmed === '' || str_starts_with($trimmed, '#')) {
+                continue;
+            }
+            if (str_starts_with($trimmed, 'export ')) {
+                $trimmed = ltrim(substr($trimmed, 7));
+            }
+            if (preg_match('/^([A-Z0-9_]+)\s*=(.*)$/', $trimmed, $m) !== 1) {
+                continue;
+            }
+
+            $key = $m[1];
+            if (! str_starts_with($key, 'MAIL_')) {
+                continue;
+            }
+
+            $mailKeyLines[$key][] = $idx + 1;
+
+            if ($key === 'MAIL_MAILER') {
+                $val = trim($m[2]);
+                if (
+                    (str_starts_with($val, '"') && str_ends_with($val, '"') && strlen($val) >= 2)
+                    || (str_starts_with($val, "'") && str_ends_with($val, "'") && strlen($val) >= 2)
+                ) {
+                    $val = substr($val, 1, -1);
+                } elseif (str_contains($val, ' #')) {
+                    $val = trim(explode(' #', $val, 2)[0]);
+                }
+                $envMailer = $val !== '' ? strtolower($val) : null;
+            }
+        }
+
+        if ($parseOk && isset($mailKeyLines['MAIL_MAILER']) && ! array_key_exists('MAIL_MAILER', $parsedKeys)) {
+            $parseOk = false;
+        }
+
+        $duplicates = [];
+        foreach ($mailKeyLines as $key => $lineNumbers) {
+            if (count($lineNumbers) > 1) {
+                $duplicates[] = $key.' (lines '.implode(', ', $lineNumbers).')';
+            }
+        }
+
+        return [
+            'env_path' => $envPath,
+            'env_exists' => true,
+            'env_parse_ok' => $parseOk,
+            'env_mailer' => $envMailer,
+            'duplicate_mail_keys' => $duplicates,
+        ];
     }
 
     private function maskUsername(string $username): ?string

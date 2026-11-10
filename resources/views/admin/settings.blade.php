@@ -129,6 +129,15 @@
             </p>
         @endif
 
+        @if (! empty($mail['duplicate_mail_keys']))
+            <p class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                Duplicate <span class="font-mono font-semibold">MAIL_*</span> entries detected in
+                <span class="font-mono">{{ basename($mail['env_path']) }}</span>:
+                <span class="font-mono">{{ implode(', ', $mail['duplicate_mail_keys']) }}</span>.
+                Remove the older lines earlier in <span class="font-mono">.env</span> so only one SMTP block remains.
+            </p>
+        @endif
+
         <dl class="mt-4 grid gap-3 sm:grid-cols-2">
             <div>
                 <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Selected mailer</dt>
@@ -138,6 +147,17 @@
                 <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Config source</dt>
                 <dd class="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">
                     {{ $mail['config_cached'] ? 'Cached (bootstrap/cache/config.php)' : 'Live (.env)' }}
+                </dd>
+            </div>
+            <div class="sm:col-span-2">
+                <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Active environment file</dt>
+                <dd class="mt-0.5 break-all font-mono text-xs text-neutral-900 dark:text-neutral-100">
+                    {{ $mail['env_path'] }}
+                    @if (! $mail['env_exists'])
+                        <span class="text-red-600 dark:text-red-400"> (missing)</span>
+                    @elseif ($mail['env_mailer'] !== null)
+                        <span class="text-neutral-500 dark:text-neutral-400"> · MAIL_MAILER={{ $mail['env_mailer'] }}</span>
+                    @endif
                 </dd>
             </div>
             <div>
