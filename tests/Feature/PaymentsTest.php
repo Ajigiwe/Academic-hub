@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Mail\OrderReceiptEmail;
 use App\Models\{Bundle, Entitlement, Order, Payment, User, WebhookEvent};
 use App\Services\BundlePricing;
 use App\Services\Payments\OrderFulfiller;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class PaymentsTest extends TestCase
@@ -229,6 +231,8 @@ class PaymentsTest extends TestCase
 
     public function test_fulfillment_is_idempotent_when_called_directly(): void
     {
+        Mail::fake();
+
         $order = $this->createPendingOrder();
         $fulfiller = app(OrderFulfiller::class);
 
@@ -244,6 +248,50 @@ class PaymentsTest extends TestCase
             Entitlement::count(),
             'No duplicate entitlement rows may exist.'
         );
+        Mail::assertSentCount(1);
+        Mail::assertSent(OrderReceiptEmail::class, fn (OrderReceiptEmail $mail) => $mail->hasTo($this->student->email));
+    }
+
+    public function test_webhook_fulfillment_sends_single_receipt_email_with_order_details(): void
+    {
+        Mail::fake();
+
+        $order = $this->makePendingOrderWithWebhook();
+
+        // Trigger verify-callback afterwards; must NOT double-send the receipt.
+        $this->actingAs($this->student)
+            ->get('/payments/verify?ref='.$order->reference)
+            ->assertRedirect();
+
+        Mail::assertSentCount(1);
+        Mail::assertSent(OrderReceiptEmail::class, function (OrderReceiptEmail $mail) use ($order) {
+            $mail->assertSeeInHtml('Purchase Confirmed');
+            $mail->assertSeeInHtml($order->reference);
+            $mail->assertSeeInHtml($this->bundle->title);
+            $mail->assertSeeInHtml('GH₵15.00');
+            $mail->assertSeeInHtml('/library');
+
+            return $mail->hasTo($this->student->email)
+                && $mail->order->id === $order->id;
+        });
+    }
+
+    public function test_mail_failure_does_not_roll_back_paid_order_or_entitlements(): void
+    {
+        Mail::shouldReceive('to')
+            ->once()
+            ->with($this->student->email)
+            ->andThrow(new \RuntimeException('SMTP connection refused'));
+
+        $order = $this->makePendingOrderWithWebhook();
+
+        $this->assertSame('PAID', $order->refresh()->status);
+        $this->assertSame(
+            $this->bundle->resources->count(),
+            Entitlement::where('user_id', $this->student->id)->count(),
+            'Paid entitlements must persist even if the mail server is down.'
+        );
+        $this->assertDatabaseHas('notifications', ['user_id' => $this->student->id, 'type' => 'PURCHASE']);
     }
 
     public function test_webhook_failure_keeps_processed_at_null_for_retry(): void

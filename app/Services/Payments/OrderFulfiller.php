@@ -2,11 +2,14 @@
 
 namespace App\Services\Payments;
 
+use App\Mail\OrderReceiptEmail;
 use App\Models\Entitlement;
 use App\Models\Order;
 use App\Models\Resource;
 use App\Services\Notifications;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * Single fulfillment path shared by webhook and verify-callback.
@@ -22,7 +25,11 @@ class OrderFulfiller
      */
     public function fulfill(string $reference): array
     {
-        return DB::transaction(function () use ($reference) {
+        $fulfilledOrder = null;
+
+        $result = DB::transaction(function () use ($reference, &$fulfilledOrder) {
+            $fulfilledOrder = null;
+
             // FOR UPDATE lock: webhook + verify-callback racing on the same
             // order serialize here; the loser sees PAID and exits as no-op.
             $order = Order::where('reference', $reference)->lockForUpdate()->first();
@@ -63,8 +70,19 @@ class OrderFulfiller
             $order->loadMissing('items.bundle');
             Notifications::purchase($order);
 
+            $fulfilledOrder = $order;
+
             return $this->result($order, $resourceIds, alreadyFulfilled: false);
         }, attempts: 3);
+
+        // Send the purchase receipt email strictly AFTER the DB transaction
+        // commits, and only for the single caller that won fulfillment —
+        // temporary SMTP issues must never roll back paid entitlements.
+        if ($fulfilledOrder !== null && ! $result['already_fulfilled']) {
+            $this->sendReceiptEmail($fulfilledOrder, count($result['entitlement_resource_ids']));
+        }
+
+        return $result;
     }
 
     /**
@@ -88,6 +106,26 @@ class OrderFulfiller
         } catch (\Illuminate\Database\UniqueConstraintViolationException) {
             // Concurrent grant already won.
             return 'existing';
+        }
+    }
+
+    private function sendReceiptEmail(Order $order, int $unlockedCount): void
+    {
+        try {
+            $order->loadMissing(['user', 'items.bundle.course', 'payments']);
+
+            $recipient = trim((string) ($order->user?->email ?? ''));
+            if ($recipient === '') {
+                return;
+            }
+
+            Mail::to($recipient)->send(new OrderReceiptEmail($order, $unlockedCount));
+        } catch (\Throwable $e) {
+            Log::warning('Order receipt email failed to send.', [
+                'order_reference' => $order->reference,
+                'user_id' => $order->user_id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
