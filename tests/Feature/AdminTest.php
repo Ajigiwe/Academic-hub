@@ -6,6 +6,7 @@ use App\Mail\TestEmail;
 use App\Models\{Bundle, Entitlement, Order, Payment, Programme, Resource, User, ViewingSession};
 use App\Services\BundlePricing;
 use App\Services\Documents\{DocumentStore, PdfWatermarker};
+use App\Services\MailSettings;
 use App\Services\Payments\EntitlementBackfill;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -573,6 +574,152 @@ class AdminTest extends TestCase
             $this->assertStringNotContainsString('unclosed-secret-value', (string) $status['note']);
         } finally {
             @unlink($tmpEnv);
+        }
+    }
+
+    public function test_guest_and_student_cannot_manage_saved_mail_settings(): void
+    {
+        $payload = [
+            'mailer' => 'smtp',
+            'host' => 'mail.example.com',
+            'port' => 465,
+            'encryption' => 'ssl',
+            'username' => 'user@example.com',
+            'password' => 'secret',
+            'from_address' => 'user@example.com',
+            'from_name' => 'Test',
+        ];
+
+        $this->post('/admin/settings/mail', $payload)->assertRedirect('/login');
+        $this->delete('/admin/settings/mail')->assertRedirect('/login');
+
+        $this->actingAs($this->student)->post('/admin/settings/mail', $payload)->assertNotFound();
+        $this->actingAs($this->student)->delete('/admin/settings/mail')->assertNotFound();
+    }
+
+    public function test_admin_smtp_settings_require_host_and_initial_password(): void
+    {
+        Storage::fake('local');
+        MailSettings::$applyInTests = true;
+
+        try {
+            $this->actingAs($this->admin)
+                ->from('/admin/settings')
+                ->post('/admin/settings/mail', [
+                    'mailer' => 'smtp',
+                    'host' => '',
+                    'port' => 465,
+                    'encryption' => 'ssl',
+                    'username' => 'support@amgacademichub.com',
+                    'password' => '',
+                    'from_address' => 'support@amgacademichub.com',
+                    'from_name' => 'Academic Hub',
+                ])
+                ->assertRedirect('/admin/settings')
+                ->assertSessionHasErrors(['host', 'password']);
+
+            $this->assertFalse(Storage::disk('local')->exists(MailSettings::STORAGE_KEY));
+        } finally {
+            MailSettings::$applyInTests = false;
+        }
+    }
+
+    public function test_admin_can_save_update_and_clear_encrypted_smtp_settings(): void
+    {
+        Storage::fake('local');
+        MailSettings::$applyInTests = true;
+
+        try {
+            config([
+                'mail.default' => 'log',
+                'mail.mailers.smtp.host' => '127.0.0.1',
+                'mail.mailers.smtp.port' => 2525,
+                'mail.mailers.smtp.password' => '',
+            ]);
+
+            $this->actingAs($this->admin)
+                ->from('/admin/settings')
+                ->post('/admin/settings/mail', [
+                    'mailer' => 'smtp',
+                    'host' => 'mail.amgacademichub.com',
+                    'port' => 465,
+                    'encryption' => 'ssl',
+                    'username' => 'support@amgacademichub.com',
+                    'password' => 'SuperSecretMail#123',
+                    'from_address' => 'support@amgacademichub.com',
+                    'from_name' => 'Academic Hub',
+                ])
+                ->assertRedirect('/admin/settings');
+
+            $this->assertTrue(Storage::disk('local')->exists(MailSettings::STORAGE_KEY));
+            $ciphertext = (string) Storage::disk('local')->get(MailSettings::STORAGE_KEY);
+            $this->assertStringNotContainsString('SuperSecretMail#123', $ciphertext, 'SMTP password must be encrypted at rest.');
+
+            $this->assertSame('smtp', config('mail.default'));
+            $this->assertSame('mail.amgacademichub.com', config('mail.mailers.smtp.host'));
+            $this->assertSame(465, config('mail.mailers.smtp.port'));
+            $this->assertSame('smtps', config('mail.mailers.smtp.scheme'));
+            $this->assertSame('SuperSecretMail#123', config('mail.mailers.smtp.password'));
+            $this->assertSame('support@amgacademichub.com', config('mail.from.address'));
+
+            $this->actingAs($this->admin)
+                ->get('/admin/settings')
+                ->assertOk()
+                ->assertSee('saved in Admin Panel')
+                ->assertSee('Admin Panel (encrypted server storage)')
+                ->assertSee('mail.amgacademichub.com')
+                ->assertSee('Use .env instead')
+                ->assertDontSee('SuperSecretMail#123');
+
+            // Boot-time apply() overrides stale .env/cached config cleanly.
+            config([
+                'mail.default' => 'log',
+                'mail.mailers.smtp.host' => '127.0.0.1',
+                'mail.mailers.smtp.password' => '',
+            ]);
+            $this->assertTrue(MailSettings::apply());
+            $this->assertSame('smtp', config('mail.default'));
+            $this->assertSame('mail.amgacademichub.com', config('mail.mailers.smtp.host'));
+            $this->assertSame('SuperSecretMail#123', config('mail.mailers.smtp.password'));
+
+            // Leaving password blank during an update preserves the encrypted password.
+            $this->actingAs($this->admin)
+                ->from('/admin/settings')
+                ->post('/admin/settings/mail', [
+                    'mailer' => 'smtp',
+                    'host' => 'mail.amgacademichub.com',
+                    'port' => 587,
+                    'encryption' => 'tls',
+                    'username' => 'support@amgacademichub.com',
+                    'password' => '',
+                    'from_address' => 'support@amgacademichub.com',
+                    'from_name' => 'Academic Hub Support',
+                ])
+                ->assertRedirect('/admin/settings')
+                ->assertSessionHasNoErrors();
+
+            $this->assertSame(587, config('mail.mailers.smtp.port'));
+            $this->assertSame('smtp', config('mail.mailers.smtp.scheme'));
+            $this->assertSame('SuperSecretMail#123', config('mail.mailers.smtp.password'));
+            $this->assertSame('Academic Hub Support', config('mail.from.name'));
+
+            Mail::fake();
+            $this->actingAs($this->admin)
+                ->from('/admin/settings')
+                ->post('/admin/settings/test-email', ['test_email' => 'verify@example.com'])
+                ->assertRedirect('/admin/settings');
+            Mail::assertSent(TestEmail::class, fn (TestEmail $mail) => $mail->hasTo('verify@example.com'));
+
+            // Clearing reverts to .env on subsequent boots.
+            $this->actingAs($this->admin)
+                ->from('/admin/settings')
+                ->delete('/admin/settings/mail')
+                ->assertRedirect('/admin/settings');
+
+            $this->assertFalse(Storage::disk('local')->exists(MailSettings::STORAGE_KEY));
+            $this->assertFalse(MailSettings::apply());
+        } finally {
+            MailSettings::$applyInTests = false;
         }
     }
 

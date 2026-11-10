@@ -33,6 +33,8 @@ class MailStatus
      *     from_address: string,
      *     from_name: string,
      *     config_cached: bool,
+     *     using_saved_settings: bool,
+     *     config_source_label: string,
      *     smtp_ready: bool,
      *     env_path: string,
      *     env_exists: bool,
@@ -66,7 +68,14 @@ class MailStatus
         $fromAddress = trim((string) config('mail.from.address', ''));
         $fromName = trim((string) config('mail.from.name', config('app.name', 'Academic Hub')));
         $configCached = app()->configurationIsCached();
+        $usingSavedSettings = (new MailSettings)->exists();
         $envInfo = $this->inspectEnvFile($envPathOverride);
+
+        $configSourceLabel = match (true) {
+            $usingSavedSettings => 'Admin Panel (encrypted server storage)',
+            $configCached => 'Cached (bootstrap/cache/config.php)',
+            default => 'Live (.env)',
+        };
 
         $smtpReady = $mailer === 'smtp'
             && $host !== ''
@@ -75,27 +84,50 @@ class MailStatus
             && $passwordSet;
 
         $note = null;
-        if ($envInfo['env_exists'] && ! $envInfo['env_parse_ok']) {
+        if ($usingSavedSettings) {
+            if ($isLocalOnly) {
+                $note = sprintf(
+                    'Saved Admin Panel mail settings are currently set to "%s", so emails are written to storage/logs/laravel.log instead of being delivered to inboxes. Switch Mailer to "smtp" below and save to send real emails.',
+                    $mailer,
+                );
+            } elseif ($mailer === 'smtp' && ! $smtpReady) {
+                $missing = [];
+                if ($host === '') {
+                    $missing[] = 'SMTP host';
+                }
+                if ($port === '') {
+                    $missing[] = 'Port';
+                }
+                if ($username === '') {
+                    $missing[] = 'SMTP username';
+                }
+                if (! $passwordSet) {
+                    $missing[] = 'SMTP password';
+                }
+
+                $note = 'Saved Admin Panel SMTP settings are missing: '.implode(', ', $missing).'.';
+            }
+        } elseif ($envInfo['env_exists'] && ! $envInfo['env_parse_ok']) {
             $note = sprintf(
-                'Your active environment file (%s) has a syntax error (such as an unquoted space or unclosed quote), so Laravel may not be reading all MAIL_* values. Fix it in cPanel File Manager and click "Reload .env config".',
+                'Your active environment file (%s) has a syntax error (such as an unquoted space or unclosed quote), so Laravel may not be reading all MAIL_* values. You can configure SMTP directly in the form below instead, or fix .env in cPanel File Manager and click "Reload .env config".',
                 $envInfo['env_path'],
             );
         } elseif ($configCached && $envInfo['env_mailer'] !== null && $envInfo['env_mailer'] !== $mailer) {
             $note = sprintf(
-                'Config cache is overriding .env: %s sets MAIL_MAILER="%s", but cached config is still using "%s". Click "Reload .env config" in the top-right corner of this card.',
+                'Config cache is overriding .env: %s sets MAIL_MAILER="%s", but cached config is still using "%s". Click "Reload .env config" in the top-right corner of this card, or save your SMTP settings below.',
                 $envInfo['env_path'],
                 $envInfo['env_mailer'],
                 $mailer,
             );
         } elseif ($isLocalOnly && $envInfo['env_mailer'] === 'smtp') {
             $note = sprintf(
-                '%s already sets MAIL_MAILER="smtp", but PHP runtime still sees "%s". Click "Reload .env config" above, check whether you have another .env folder on the server, or check for an external environment variable.',
+                '%s already sets MAIL_MAILER="smtp", but PHP runtime still sees "%s". Configure SMTP directly in the form below to bypass cached/external environment overrides, or click "Reload .env config" above.',
                 $envInfo['env_path'],
                 $mailer,
             );
         } elseif ($isLocalOnly) {
             $note = sprintf(
-                'Mailer is set to "%s", so emails (including password resets and order receipts) are written to storage/logs/laravel.log instead of being delivered to inboxes. Update MAIL_* values in %s via cPanel File Manager, then click "Reload .env config".',
+                'Mailer is set to "%s", so emails (including password resets and order receipts) are written to storage/logs/laravel.log instead of being delivered to inboxes. Enter your SMTP credentials in the form below (recommended), or update MAIL_* values in %s.',
                 $mailer,
                 $envInfo['env_path'],
             );
@@ -129,6 +161,8 @@ class MailStatus
             'from_address' => $fromAddress,
             'from_name' => $fromName,
             'config_cached' => $configCached,
+            'using_saved_settings' => $usingSavedSettings,
+            'config_source_label' => $configSourceLabel,
             'smtp_ready' => $smtpReady,
             'env_path' => $envInfo['env_path'],
             'env_exists' => $envInfo['env_exists'],
@@ -196,22 +230,22 @@ class MailStatus
         $port = (int) ($snapshot['port'] ?? 0);
 
         if ($port === 465 || str_contains($lower, 'ssl') || str_contains($lower, 'stream') || str_contains($lower, 'eof') || str_contains($lower, 'timed out')) {
-            $tips[] = 'Port 465 requires SSL/SMTPS: in .env set MAIL_PORT=465, MAIL_ENCRYPTION=ssl, MAIL_SCHEME=smtps (or try TLS on Port 587 with MAIL_PORT=587, MAIL_ENCRYPTION=tls, MAIL_SCHEME=smtp).';
+            $tips[] = 'Port 465 requires SSL / SMTPS encryption (or switch to Port 587 with TLS / STARTTLS encryption).';
         } else {
-            $tips[] = 'Port 465 uses SSL (MAIL_PORT=465, MAIL_ENCRYPTION=ssl, MAIL_SCHEME=smtps); Port 587 uses STARTTLS (MAIL_PORT=587, MAIL_ENCRYPTION=tls, MAIL_SCHEME=smtp).';
+            $tips[] = 'Port 465 uses SSL / SMTPS encryption; Port 587 uses TLS / STARTTLS encryption.';
         }
 
         if (str_contains($lower, 'connection') || str_contains($lower, 'refused') || str_contains($lower, 'timed out') || str_contains($lower, 'getaddrinfo')) {
-            $tips[] = 'On shared cPanel hosts where outbound remote connections are restricted, try MAIL_HOST=localhost (or the exact server hostname shown in cPanel → Email Accounts → Connect Devices).';
+            $tips[] = 'On shared cPanel hosts where outbound remote connections are restricted, try SMTP host "localhost" (or the exact server hostname shown in cPanel → Email Accounts → Connect Devices).';
         }
 
         if (str_contains($lower, '535') || str_contains($lower, 'auth') || str_contains($lower, 'credentials')) {
-            $tips[] = 'Check MAIL_USERNAME (use the full email address, e.g. support@amgacademichub.com) and wrap MAIL_PASSWORD="..." in double quotes in .env if it contains #, $, or spaces.';
+            $tips[] = 'Check SMTP username (use the full email address, e.g. support@amgacademichub.com) and re-enter the email account password in the SMTP form above.';
         }
 
-        $tips[] = 'Ensure MAIL_FROM_ADDRESS matches your cPanel domain email (e.g. support@amgacademichub.com).';
+        $tips[] = 'Ensure From email address matches your cPanel domain email (e.g. support@amgacademichub.com).';
 
-        if (! empty($snapshot['config_cached'])) {
+        if (! empty($snapshot['config_cached']) && empty($snapshot['using_saved_settings'])) {
             $tips[] = 'Config is currently cached — click "Reload .env config" above after saving .env in cPanel File Manager.';
         }
 

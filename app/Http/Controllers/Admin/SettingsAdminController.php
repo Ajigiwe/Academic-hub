@@ -7,12 +7,14 @@ use App\Models\Bundle;
 use App\Models\Programme;
 use App\Models\Setting;
 use App\Services\BundlePricing;
+use App\Services\MailSettings;
 use App\Services\MailStatus;
 use App\Services\Payments\PaymentManager;
 use App\Services\ProgrammeSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 /**
  * Admin → Settings: the platform bundle price, programme visibility
@@ -22,7 +24,7 @@ use Illuminate\Support\Facades\DB;
  */
 class SettingsAdminController extends Controller
 {
-    public function index(PaymentManager $payments, MailStatus $mailStatus)
+    public function index(PaymentManager $payments, MailStatus $mailStatus, MailSettings $mailSettings)
     {
         $programmes = ProgrammeSettings::allWithVisibility();
 
@@ -45,6 +47,7 @@ class SettingsAdminController extends Controller
             // needs. Secrets stay in the environment and are never shown.
             'payments' => $payments->status(),
             'mail' => $mailStatus->status(),
+            'mailForm' => $mailSettings->formDefaults(),
             'price' => BundlePricing::formatted(),
             'bundleCount' => Bundle::count(),
             'outOfSyncCount' => BundlePricing::outOfSyncCount(),
@@ -193,6 +196,53 @@ class SettingsAdminController extends Controller
     }
 
     /**
+     * Encrypt and save SMTP settings right from Admin -> Settings so shared
+     * cPanel deployments never depend on editing the right .env copy.
+     */
+    public function updateMailSettings(Request $request, MailSettings $mailSettings)
+    {
+        $existing = $mailSettings->get();
+        $hasSavedPassword = ($existing['password'] ?? '') !== '';
+
+        $data = $request->validate([
+            'mailer' => ['required', Rule::in(['smtp', 'log'])],
+            'host' => ['nullable', 'string', 'max:255', 'required_if:mailer,smtp'],
+            'port' => ['nullable', 'integer', 'min:1', 'max:65535', 'required_if:mailer,smtp'],
+            'encryption' => ['nullable', Rule::in(['ssl', 'tls', 'none']), 'required_if:mailer,smtp'],
+            'username' => ['nullable', 'string', 'max:255', 'required_if:mailer,smtp'],
+            'password' => $hasSavedPassword
+                ? ['nullable', 'string', 'max:255']
+                : ['nullable', 'string', 'max:255', 'required_if:mailer,smtp'],
+            'from_address' => ['required', 'email', 'max:255'],
+            'from_name' => ['required', 'string', 'max:120'],
+        ], [
+            'password.required_if' => 'Enter your SMTP email account password.',
+        ]);
+
+        $saved = $mailSettings->save($data);
+
+        $message = $saved['mailer'] === 'smtp'
+            ? sprintf(
+                'SMTP settings saved (%s:%d) — ready to send emails. Click "Send test email" below to verify delivery.',
+                $saved['host'],
+                $saved['port'],
+            )
+            : 'Mail settings saved in log-only mode — emails write to storage/logs/laravel.log.';
+
+        return back()->with('status', $message);
+    }
+
+    /**
+     * Remove the Admin Panel SMTP override and revert to .env configuration.
+     */
+    public function clearMailSettings(MailSettings $mailSettings)
+    {
+        $mailSettings->clear();
+
+        return back()->with('status', 'Saved Admin Panel SMTP settings removed — Laravel is now reading mail configuration from .env.');
+    }
+
+    /**
      * Clear the cached Laravel configuration so .env updates made via
      * cPanel File Manager take effect without needing terminal access.
      */
@@ -236,25 +286,32 @@ class SettingsAdminController extends Controller
 
         if ($result['ok']) {
             if ($result['is_local_only']) {
-                $message = $snapshot['config_cached']
-                    ? sprintf(
-                        'Test email written to storage/logs/laravel.log for %s because cached config still holds MAIL_MAILER="%s" — click "Reload .env config" in the Email & SMTP card first.',
+                if ($snapshot['using_saved_settings']) {
+                    $message = sprintf(
+                        'Test email written to storage/logs/laravel.log for %s (Mailer is saved as "%s" — switch Mailer to SMTP and click "Save SMTP settings" to deliver to real inboxes).',
                         $recipient,
                         $result['mailer'],
-                    )
-                    : ($snapshot['env_mailer'] === 'smtp'
+                    );
+                } else {
+                    $message = $snapshot['config_cached']
                         ? sprintf(
-                            'Test email written to storage/logs/laravel.log for %s — %s sets MAIL_MAILER="smtp", but PHP runtime still sees "%s". Check the Email & SMTP card diagnostics below.',
+                            'Test email written to storage/logs/laravel.log for %s because cached config still holds MAIL_MAILER="%s" — save your SMTP settings below, or click "Reload .env config".',
                             $recipient,
-                            $snapshot['env_path'],
                             $result['mailer'],
                         )
-                        : sprintf(
-                            'Test email written to storage/logs/laravel.log for %s (MAIL_MAILER is "%s" — update %s to "smtp" and click "Reload .env config" to deliver to real inboxes).',
-                            $recipient,
-                            $result['mailer'],
-                            $snapshot['env_path'],
-                        ));
+                        : ($snapshot['env_mailer'] === 'smtp'
+                            ? sprintf(
+                                'Test email written to storage/logs/laravel.log for %s — %s sets MAIL_MAILER="smtp", but PHP runtime still sees "%s". Configure SMTP directly in the form below to override it.',
+                                $recipient,
+                                $snapshot['env_path'],
+                                $result['mailer'],
+                            )
+                            : sprintf(
+                                'Test email written to storage/logs/laravel.log for %s (MAIL_MAILER is "%s" — configure SMTP in the Email & SMTP form below to deliver to real inboxes).',
+                                $recipient,
+                                $result['mailer'],
+                            ));
+                }
             } else {
                 $message = sprintf(
                     'Test email sent to %s via %s — check the inbox (and spam folder).',

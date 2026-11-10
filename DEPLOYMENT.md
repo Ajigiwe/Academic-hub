@@ -155,7 +155,12 @@ For password reset links and student notifications, configure SMTP using your cP
    - Username: `support` (or `noreply`), e.g. `support@amgacademichub.com`.
    - Set a strong password and save it.
 
-2. **Edit `.env` via cPanel File Manager**:
+2. **Configure SMTP in Admin Panel (Recommended — No File Manager Needed)**:
+   - Log in to Admin Panel → **Settings** (`https://yourdomain.com/admin/settings`) → **Email & SMTP**.
+   - Fill in **Configure SMTP in Admin Panel** (`smtp`, `mail.amgacademichub.com`, port `465`, `SSL / SMTPS`, your cPanel email username & password, and From address) and click **Save SMTP settings**.
+   - Credentials are encrypted with `APP_KEY` inside `storage/app/private/mail/smtp.enc` and apply immediately across both web requests and `artisan mail:test`.
+
+3. **Alternative: Edit `.env` via cPanel File Manager**:
    - Open cPanel → **File Manager**.
    - Click **Settings** (top-right) and enable **Show Hidden Files (dotfiles)**.
    - Check the **Active environment file** path shown in **Admin Panel → Settings → Email & SMTP**, open that exact `.env` in File Manager, and **replace the existing `MAIL_*` lines** (do not leave old `MAIL_MAILER=log` lines above it):
@@ -170,12 +175,10 @@ For password reset links and student notifications, configure SMTP using your cP
    MAIL_FROM_ADDRESS=support@amgacademichub.com
    MAIL_FROM_NAME="Academic Hub"
    ```
-   *(Tip: click **Save Changes** in File Manager, wrap `MAIL_PASSWORD` in double quotes if it contains `#`, `$`, or spaces, and if `mail.amgacademichub.com` times out on shared hosting try `MAIL_HOST=localhost`.)*
+   *(Tip: if you edited `.env`, click **Reload .env config** in the **Email & SMTP** card. Wrap `MAIL_PASSWORD` in double quotes if it contains `#`, `$`, or spaces, and if `mail.amgacademichub.com` times out on shared hosting try `localhost`.)*
 
-3. **Reload Config & Test Email Delivery from Admin Panel (No Terminal Needed)**:
-   - Log in to the Admin Panel → **Settings** (`https://yourdomain.com/admin/settings`).
-   - Under the **Email & SMTP** card, click **Reload .env config** so Laravel clears `bootstrap/cache/config.php` and reads your `.env` edits immediately.
-   - Verify **Selected mailer** shows `smtp`, then enter your personal email address under **Send test email to** and click **Send test email**.
+4. **Test Email Delivery from Admin Panel (No Terminal Needed)**:
+   - Under the **Email & SMTP** card, verify **Selected mailer** shows `smtp`, enter your personal email address under **Send test email to**, and click **Send test email**.
    - If successful, a branded test email arrives in your inbox within seconds; if SMTP fails, the card shows the exact error and port/encryption hints right on screen.
    - *(Optional CLI alternative on hosts with SSH/Terminal: `php artisan mail:test your_personal_email@gmail.com`.)*
 

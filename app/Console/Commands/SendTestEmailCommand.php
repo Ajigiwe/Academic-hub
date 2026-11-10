@@ -37,6 +37,7 @@ class SendTestEmailCommand extends Command
 
         $this->info("=== Mail Configuration Test ===");
         $this->line("Default Mailer: <comment>{$status['mailer']}</comment>");
+        $this->line("Config Source:  <comment>{$status['config_source_label']}</comment>");
         $this->line("From Address:   <comment>{$status['from_address']} ({$status['from_name']})</comment>");
 
         if ($status['mailer'] === 'smtp') {

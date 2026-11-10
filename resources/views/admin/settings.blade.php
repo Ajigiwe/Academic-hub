@@ -103,7 +103,9 @@
             <div class="flex flex-wrap items-center gap-2">
                 <h2 class="text-base font-semibold text-neutral-900 dark:text-white">Email &amp; SMTP</h2>
                 <span class="{{ $mailBadge }} font-semibold">{{ $mailLabel }}</span>
-                @if ($mail['config_cached'])
+                @if ($mail['using_saved_settings'])
+                    <span class="badge-brand">saved in Admin Panel</span>
+                @elseif ($mail['config_cached'])
                     <span class="badge-neutral">config cached</span>
                 @endif
             </div>
@@ -118,9 +120,9 @@
         </div>
 
         <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-            Password reset links and system emails run through your active mailer. On cPanel hosts without
-            Terminal/SSH, edit <span class="font-mono">.env</span> in <strong>File Manager</strong>, click
-            <strong>Reload .env config</strong> above, and test delivery below.
+            Password reset links and purchase receipts run through your active mailer. Save your SMTP
+            credentials directly below (encrypted on the server), or configure <span class="font-mono">.env</span>
+            in cPanel File Manager and click <strong>Reload .env config</strong>.
         </p>
 
         @if ($mail['note'])
@@ -129,7 +131,7 @@
             </p>
         @endif
 
-        @if (! empty($mail['duplicate_mail_keys']))
+        @if (! $mail['using_saved_settings'] && ! empty($mail['duplicate_mail_keys']))
             <p class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-300">
                 Duplicate <span class="font-mono font-semibold">MAIL_*</span> entries detected in
                 <span class="font-mono">{{ basename($mail['env_path']) }}</span>:
@@ -146,7 +148,7 @@
             <div>
                 <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Config source</dt>
                 <dd class="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">
-                    {{ $mail['config_cached'] ? 'Cached (bootstrap/cache/config.php)' : 'Live (.env)' }}
+                    {{ $mail['config_source_label'] }}
                 </dd>
             </div>
             <div class="sm:col-span-2">
@@ -187,9 +189,125 @@
             </div>
         </dl>
 
+        {{-- Save encrypted SMTP configuration directly from the browser --}}
+        <form method="POST" action="{{ route('admin.settings.mail') }}"
+              class="mt-5 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+            @csrf
+            <h3 class="text-sm font-semibold text-neutral-900 dark:text-white">Configure SMTP in Admin Panel</h3>
+            <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                Credentials are encrypted with the app key in private server storage — no <span class="font-mono">.env</span> edits or terminal needed.
+            </p>
+
+            @php
+                $selectedMailer = old('mailer', $mailForm['mailer']);
+                $selectedEncryption = old('encryption', $mailForm['encryption']);
+            @endphp
+
+            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="label" for="smtp-mailer">Mailer</label>
+                    <select id="smtp-mailer" name="mailer" class="input py-2 text-sm">
+                        <option value="smtp" @selected($selectedMailer === 'smtp')>SMTP (deliver to inboxes)</option>
+                        <option value="log" @selected($selectedMailer === 'log')>Log only (storage/logs/laravel.log)</option>
+                    </select>
+                    @error('mailer')
+                        <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label class="label" for="smtp-encryption">Encryption</label>
+                    <select id="smtp-encryption" name="encryption" class="input py-2 text-sm">
+                        <option value="ssl" @selected($selectedEncryption === 'ssl')>SSL / SMTPS (port 465)</option>
+                        <option value="tls" @selected($selectedEncryption === 'tls')>TLS / STARTTLS (port 587)</option>
+                        <option value="none" @selected($selectedEncryption === 'none')>None (unencrypted)</option>
+                    </select>
+                    @error('encryption')
+                        <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label class="label" for="smtp-host">SMTP host</label>
+                    <input id="smtp-host" name="host" type="text" maxlength="255"
+                           value="{{ old('host', $mailForm['host']) }}"
+                           placeholder="mail.amgacademichub.com"
+                           class="input py-2 text-sm">
+                    @error('host')
+                        <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label class="label" for="smtp-port">Port</label>
+                    <input id="smtp-port" name="port" type="number" min="1" max="65535"
+                           value="{{ old('port', $mailForm['port']) }}"
+                           placeholder="465"
+                           class="input py-2 text-sm tabular-nums">
+                    @error('port')
+                        <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label class="label" for="smtp-username">SMTP username</label>
+                    <input id="smtp-username" name="username" type="text" maxlength="255" autocomplete="off"
+                           value="{{ old('username', $mailForm['username']) }}"
+                           placeholder="support@amgacademichub.com"
+                           class="input py-2 text-sm">
+                    @error('username')
+                        <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label class="label" for="smtp-password">SMTP password</label>
+                    <input id="smtp-password" name="password" type="password" maxlength="255" autocomplete="new-password"
+                           value=""
+                           placeholder="{{ $mailForm['has_saved_password'] ? '•••••••• (leave blank to keep current)' : 'Enter email account password' }}"
+                           class="input py-2 text-sm">
+                    @error('password')
+                        <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label class="label" for="smtp-from-address">From email address</label>
+                    <input id="smtp-from-address" name="from_address" type="email" required maxlength="255"
+                           value="{{ old('from_address', $mailForm['from_address']) }}"
+                           placeholder="support@amgacademichub.com"
+                           class="input py-2 text-sm">
+                    @error('from_address')
+                        <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label class="label" for="smtp-from-name">From name</label>
+                    <input id="smtp-from-name" name="from_name" type="text" required maxlength="120"
+                           value="{{ old('from_name', $mailForm['from_name']) }}"
+                           placeholder="Academic Hub"
+                           class="input py-2 text-sm">
+                    @error('from_name')
+                        <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+            </div>
+
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+                <button type="submit" class="btn-primary">Save SMTP settings</button>
+                @if ($mail['using_saved_settings'])
+                    <button type="submit" form="clear-mail-settings-form" class="btn-secondary btn-sm"
+                            onclick="return confirm('Remove saved Admin Panel SMTP settings and fall back to .env?')">
+                        Use .env instead
+                    </button>
+                @endif
+            </div>
+        </form>
+
+        @if ($mail['using_saved_settings'])
+            <form id="clear-mail-settings-form" method="POST" action="{{ route('admin.settings.mail.clear') }}" class="hidden">
+                @csrf
+                @method('DELETE')
+            </form>
+        @endif
+
         {{-- Send test email directly from the browser --}}
         <form method="POST" action="{{ route('admin.settings.test-email') }}"
-              class="mt-4 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+              class="mt-5 border-t border-neutral-200 pt-4 dark:border-neutral-800">
             @csrf
             <div class="flex flex-wrap items-end gap-3">
                 <div class="min-w-0 flex-1">
@@ -411,6 +529,18 @@
             document.addEventListener('keydown', function (e) {
                 if (e.key === 'Escape') closeRenameModal();
             });
+            var smtpEnc = document.getElementById('smtp-encryption');
+            var smtpPort = document.getElementById('smtp-port');
+            if (smtpEnc && smtpPort) {
+                smtpEnc.addEventListener('change', function () {
+                    var current = smtpPort.value.trim();
+                    if (this.value === 'ssl' && (current === '' || current === '587')) {
+                        smtpPort.value = '465';
+                    } else if (this.value === 'tls' && (current === '' || current === '465')) {
+                        smtpPort.value = '587';
+                    }
+                });
+            }
         </script>
     @endpush
 @endsection
