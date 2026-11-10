@@ -7,9 +7,11 @@ use App\Models\Bundle;
 use App\Models\Programme;
 use App\Models\Setting;
 use App\Services\BundlePricing;
+use App\Services\MailStatus;
 use App\Services\Payments\PaymentManager;
 use App\Services\ProgrammeSettings;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -20,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  */
 class SettingsAdminController extends Controller
 {
-    public function index(PaymentManager $payments)
+    public function index(PaymentManager $payments, MailStatus $mailStatus)
     {
         $programmes = ProgrammeSettings::allWithVisibility();
 
@@ -42,6 +44,7 @@ class SettingsAdminController extends Controller
             // selected, whether it is ready, and the exact URLs Paystack
             // needs. Secrets stay in the environment and are never shown.
             'payments' => $payments->status(),
+            'mail' => $mailStatus->status(),
             'price' => BundlePricing::formatted(),
             'bundleCount' => Bundle::count(),
             'outOfSyncCount' => BundlePricing::outOfSyncCount(),
@@ -187,6 +190,56 @@ class SettingsAdminController extends Controller
         });
 
         return back()->with('status', "Programme \"{$name}\" was deleted.");
+    }
+
+    /**
+     * Clear the cached Laravel configuration so .env updates made via
+     * cPanel File Manager take effect without needing terminal access.
+     */
+    public function clearConfigCache()
+    {
+        Artisan::call('config:clear');
+
+        if (function_exists('opcache_reset')) {
+            @opcache_reset();
+        }
+
+        return back()->with('status', 'Config cache cleared — Laravel is now reading fresh values from .env.');
+    }
+
+    /**
+     * Send a branded test email directly from the browser so SMTP can be
+     * verified on shared hosting without cPanel Terminal or SSH.
+     */
+    public function sendTestEmail(Request $request, MailStatus $mailStatus)
+    {
+        $data = $request->validate([
+            'test_email' => ['required', 'email', 'max:255'],
+        ]);
+
+        $recipient = trim($data['test_email']);
+        $result = $mailStatus->sendTest($recipient, $request->user()?->email);
+
+        if ($result['ok']) {
+            $message = $result['is_local_only']
+                ? sprintf(
+                    'Test email written to storage/logs/laravel.log for %s (MAIL_MAILER is "%s" — update .env to "smtp" and click "Reload .env config" to deliver to real inboxes).',
+                    $recipient,
+                    $result['mailer'],
+                )
+                : sprintf(
+                    'Test email sent to %s via %s — check the inbox (and spam folder).',
+                    $recipient,
+                    $result['mailer'],
+                );
+
+            return back()->withInput()->with('status', $message);
+        }
+
+        return back()
+            ->withInput()
+            ->with('error', 'Failed to send test email: '.$result['error'])
+            ->with('mail_test_error', $result);
     }
 
 }

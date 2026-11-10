@@ -85,6 +85,126 @@
         @endif
     </section>
 
+    {{-- ── Email & SMTP ────────────────────────────────────────────── --}}
+    @php
+        $mailReady = $mail['mailer'] === 'smtp' && $mail['smtp_ready'];
+        $mailBadge = $mailReady
+            ? 'badge-success'
+            : ($mail['is_local_only'] ? 'badge-gold' : ($mail['mailer'] === 'smtp' ? 'badge-danger' : 'badge-brand'));
+        $mailLabel = $mailReady
+            ? 'SMTP · configured'
+            : ($mail['is_local_only']
+                ? ucfirst($mail['mailer']).' · logs only'
+                : ($mail['mailer'] === 'smtp' ? 'SMTP · incomplete' : ucfirst($mail['mailer'])));
+    @endphp
+
+    <section id="email-settings" class="card mt-5 max-w-2xl p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-base font-semibold text-neutral-900 dark:text-white">Email &amp; SMTP</h2>
+                <span class="{{ $mailBadge }} font-semibold">{{ $mailLabel }}</span>
+                @if ($mail['config_cached'])
+                    <span class="badge-neutral">config cached</span>
+                @endif
+            </div>
+
+            <form method="POST" action="{{ route('admin.settings.clear-config') }}">
+                @csrf
+                <button type="submit" class="btn-secondary btn-sm"
+                        title="Clear cached config so edits to .env in cPanel File Manager load immediately">
+                    Reload .env config
+                </button>
+            </form>
+        </div>
+
+        <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+            Password reset links and system emails run through your active mailer. On cPanel hosts without
+            Terminal/SSH, edit <span class="font-mono">.env</span> in <strong>File Manager</strong>, click
+            <strong>Reload .env config</strong> above, and test delivery below.
+        </p>
+
+        @if ($mail['note'])
+            <p class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                {{ $mail['note'] }}
+            </p>
+        @endif
+
+        <dl class="mt-4 grid gap-3 sm:grid-cols-2">
+            <div>
+                <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Selected mailer</dt>
+                <dd class="mt-0.5 font-mono text-sm text-neutral-900 dark:text-neutral-100">{{ $mail['mailer'] }}</dd>
+            </div>
+            <div>
+                <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Config source</dt>
+                <dd class="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">
+                    {{ $mail['config_cached'] ? 'Cached (bootstrap/cache/config.php)' : 'Live (.env)' }}
+                </dd>
+            </div>
+            <div>
+                <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">SMTP host</dt>
+                <dd class="mt-0.5 break-all font-mono text-xs text-neutral-900 dark:text-neutral-100">{{ $mail['host'] ?: '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Port &amp; scheme</dt>
+                <dd class="mt-0.5 font-mono text-xs text-neutral-900 dark:text-neutral-100">
+                    {{ $mail['port'] ?: '—' }} · {{ $mail['scheme_label'] }}
+                </dd>
+            </div>
+            <div>
+                <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">SMTP credentials</dt>
+                <dd class="mt-0.5 text-xs text-neutral-900 dark:text-neutral-100">
+                    <span class="font-mono">{{ $mail['username_masked'] ?? 'Username not set' }}</span>
+                    <span class="text-neutral-500 dark:text-neutral-400">
+                        · password {{ $mail['password_set'] ? 'set' : 'missing' }}
+                    </span>
+                </dd>
+            </div>
+            <div>
+                <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">From address</dt>
+                <dd class="mt-0.5 break-all font-mono text-xs text-neutral-900 dark:text-neutral-100">
+                    {{ $mail['from_name'] ? $mail['from_name'].' ' : '' }}&lt;{{ $mail['from_address'] ?: '—' }}&gt;
+                </dd>
+            </div>
+        </dl>
+
+        {{-- Send test email directly from the browser --}}
+        <form method="POST" action="{{ route('admin.settings.test-email') }}"
+              class="mt-4 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+            @csrf
+            <div class="flex flex-wrap items-end gap-3">
+                <div class="min-w-0 flex-1">
+                    <label class="label" for="test-email-input">Send test email to</label>
+                    <input id="test-email-input" name="test_email" type="email" required
+                           value="{{ old('test_email', auth()->user()->email) }}"
+                           placeholder="you@gmail.com"
+                           class="input py-2 text-sm">
+                </div>
+                <button type="submit" class="btn-primary">Send test email</button>
+            </div>
+            @error('test_email')
+                <p class="mt-1.5 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+            @enderror
+            <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+                Dispatches a branded test email immediately so you can verify SMTP credentials without SSH or Terminal access.
+            </p>
+        </form>
+
+        @if (session('mail_test_error'))
+            @php $mailFailure = session('mail_test_error'); @endphp
+            <div class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800 dark:border-red-900 dark:bg-red-950/60 dark:text-red-300">
+                <p class="font-semibold">SMTP delivery diagnostics</p>
+                <p class="mt-1 break-all font-mono text-[11px]">{{ $mailFailure['error'] ?? '' }}</p>
+                @if (! empty($mailFailure['tips']))
+                    <ul class="mt-2.5 list-disc space-y-1 pl-4 text-[11px]">
+                        @foreach ($mailFailure['tips'] as $tip)
+                            <li>{{ $tip }}</li>
+                        @endforeach
+                    </ul>
+                @endif
+            </div>
+        @endif
+    </section>
+
     {{-- ── Platform bundle price ───────────────────────────────────── --}}
     <section class="card mt-5 max-w-2xl p-5">
         <h2 class="text-base font-semibold text-neutral-900 dark:text-white">Bundle price</h2>

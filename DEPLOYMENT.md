@@ -146,7 +146,7 @@ Set this in the Paystack dashboard → *Settings → API Keys & Webhooks*. It mu
 be the live URL once you switch `PAYSTACK_SECRET_KEY` to the live key. Ensure
 `APP_URL` matches, so payment return redirects land on the right host.
 
-## 9. Email & SMTP Configuration (cPanel)
+## 9. Email & SMTP Configuration (cPanel — No Terminal Required)
 
 For password reset links and student notifications, configure SMTP using your cPanel email:
 
@@ -155,26 +155,29 @@ For password reset links and student notifications, configure SMTP using your cP
    - Username: `support` (or `noreply`), e.g. `support@amgacademichub.com`.
    - Set a strong password and save it.
 
-2. **Add Settings to your Server `.env`**:
-   In `/home/CPUSER/academic-hub/.env`, add:
+2. **Edit `.env` via cPanel File Manager**:
+   - Open cPanel → **File Manager**.
+   - Click **Settings** (top-right) and enable **Show Hidden Files (dotfiles)**.
+   - Locate your app folder (e.g. `/home/CPUSER/academic-hub/.env`), right-click `.env` → **Edit**, and update:
    ```env
    MAIL_MAILER=smtp
    MAIL_HOST=mail.amgacademichub.com
    MAIL_PORT=465
    MAIL_USERNAME=support@amgacademichub.com
-   MAIL_PASSWORD=your_email_password_here
+   MAIL_PASSWORD="your_email_password_here"
    MAIL_ENCRYPTION=ssl
    MAIL_SCHEME=smtps
    MAIL_FROM_ADDRESS=support@amgacademichub.com
    MAIL_FROM_NAME="Academic Hub"
    ```
+   *(Tip: wrap `MAIL_PASSWORD` in double quotes if it contains `#`, `$`, or spaces. If `mail.amgacademichub.com` times out on shared hosting, try `MAIL_HOST=localhost`.)*
 
-3. **Test Email Delivery**:
-   In cPanel Terminal or SSH, run:
-   ```bash
-   php artisan mail:test your_personal_email@gmail.com
-   ```
-   If configured properly, you will receive a test branded email in your inbox within seconds!
+3. **Reload Config & Test Email Delivery from Admin Panel (No Terminal Needed)**:
+   - Log in to the Admin Panel → **Settings** (`https://yourdomain.com/admin/settings`).
+   - Under the **Email & SMTP** card, click **Reload .env config** so Laravel picks up your `.env` edits immediately.
+   - Enter your personal email address under **Send test email to** and click **Send test email**.
+   - If successful, a branded test email arrives in your inbox within seconds; if SMTP fails, the card shows the exact error and port/encryption hints right on screen.
+   - *(Optional CLI alternative on hosts with SSH/Terminal: `php artisan mail:test your_personal_email@gmail.com`.)*
 
 ## 10. Automated Deploy Engine & Git Updates
 

@@ -158,6 +158,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/settings', [SettingsAdminController::class, 'store'])->name('settings.store');
     // Declared before the {programme} routes so it is never swallowed.
     Route::post('/settings/pricing', [SettingsAdminController::class, 'updatePricing'])->name('settings.pricing');
+    Route::post('/settings/test-email', [SettingsAdminController::class, 'sendTestEmail'])->name('settings.test-email');
+    Route::post('/settings/clear-config', [SettingsAdminController::class, 'clearConfigCache'])->name('settings.clear-config');
     Route::post('/settings/{programme}/toggle', [SettingsAdminController::class, 'toggle'])->name('settings.toggle');
     Route::post('/settings/{programme}/rename', [SettingsAdminController::class, 'rename'])->name('settings.rename');
     Route::delete('/settings/{programme}', [SettingsAdminController::class, 'destroy'])->name('settings.destroy');

@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Mail\TestEmail;
 use App\Models\{Bundle, Entitlement, Order, Payment, Programme, Resource, User, ViewingSession};
 use App\Services\BundlePricing;
 use App\Services\Documents\{DocumentStore, PdfWatermarker};
 use App\Services\Payments\EntitlementBackfill;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -404,6 +406,131 @@ class AdminTest extends TestCase
         // Idempotent: re-running the backfill fills nothing new.
         $backfill = new EntitlementBackfill;
         $this->assertSame(0, $backfill->grantBundlePapersToPastBuyers($this->bundle->id));
+    }
+
+    // ── Email diagnostics & browser test sender (no-terminal cPanel) ──
+
+    public function test_settings_renders_email_diagnostics_without_exposing_password(): void
+    {
+        config([
+            'mail.default' => 'smtp',
+            'mail.mailers.smtp.host' => 'mail.amgacademichub.com',
+            'mail.mailers.smtp.port' => 465,
+            'mail.mailers.smtp.scheme' => 'smtps',
+            'mail.mailers.smtp.username' => 'support@amgacademichub.com',
+            'mail.mailers.smtp.password' => 'SuperSecretMailPass#99',
+            'mail.from.address' => 'support@amgacademichub.com',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/admin/settings')
+            ->assertOk()
+            ->assertSee('Email & SMTP')
+            ->assertSee('mail.amgacademichub.com')
+            ->assertSee('sup***@amgacademichub.com')
+            ->assertSee('Send test email')
+            ->assertDontSee('SuperSecretMailPass#99');
+    }
+
+    public function test_guest_and_student_cannot_send_test_email_or_clear_config(): void
+    {
+        $this->post('/admin/settings/test-email', ['test_email' => 'x@example.com'])->assertRedirect('/login');
+        $this->post('/admin/settings/clear-config')->assertRedirect('/login');
+
+        $this->actingAs($this->student)
+            ->post('/admin/settings/test-email', ['test_email' => 'x@example.com'])
+            ->assertNotFound();
+        $this->actingAs($this->student)
+            ->post('/admin/settings/clear-config')
+            ->assertNotFound();
+    }
+
+    public function test_admin_can_send_test_email_from_settings(): void
+    {
+        Mail::fake();
+
+        $response = $this->actingAs($this->admin)
+            ->from('/admin/settings')
+            ->post('/admin/settings/test-email', ['test_email' => 'owner@example.com']);
+
+        $response->assertRedirect('/admin/settings');
+        $this->assertNotNull(session('status'));
+
+        Mail::assertSent(TestEmail::class, function (TestEmail $mail) {
+            return $mail->hasTo('owner@example.com');
+        });
+    }
+
+    public function test_admin_test_email_renders_cleanly(): void
+    {
+        $mailable = new TestEmail([
+            'mailer' => 'smtp',
+            'host' => 'mail.amgacademichub.com',
+            'port' => '465',
+            'scheme_label' => 'smtps (SSL)',
+            'from_name' => 'Academic Hub',
+            'from_address' => 'support@amgacademichub.com',
+        ], 'admin@pastq.test');
+
+        $mailable->assertSeeInHtml('SMTP Delivery Confirmed');
+        $mailable->assertSeeInHtml('mail.amgacademichub.com:465');
+    }
+
+    public function test_test_email_validates_recipient_address(): void
+    {
+        Mail::fake();
+
+        $this->actingAs($this->admin)
+            ->from('/admin/settings')
+            ->post('/admin/settings/test-email', ['test_email' => 'not-an-email'])
+            ->assertRedirect('/admin/settings')
+            ->assertSessionHasErrors('test_email');
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_test_email_failure_flashes_smtp_diagnostics_instead_of_crashing(): void
+    {
+        config([
+            'mail.default' => 'smtp',
+            'mail.mailers.smtp.port' => 465,
+        ]);
+
+        Mail::shouldReceive('to')
+            ->once()
+            ->with('owner@example.com')
+            ->andThrow(new \RuntimeException('Connection timed out on port 465'));
+
+        $this->actingAs($this->admin)
+            ->from('/admin/settings')
+            ->post('/admin/settings/test-email', ['test_email' => 'owner@example.com'])
+            ->assertRedirect('/admin/settings');
+
+        $this->assertStringContainsString('Connection timed out on port 465', (string) session('error'));
+        $failure = session('mail_test_error');
+        $this->assertIsArray($failure);
+        $this->assertFalse($failure['ok']);
+        $this->assertNotEmpty($failure['tips']);
+    }
+
+    public function test_admin_can_clear_config_cache_from_settings(): void
+    {
+        $this->actingAs($this->admin)
+            ->from('/admin/settings')
+            ->post('/admin/settings/clear-config')
+            ->assertRedirect('/admin/settings');
+
+        $this->assertNotNull(session('status'));
+    }
+
+    public function test_artisan_mail_test_command_dispatches_test_email(): void
+    {
+        Mail::fake();
+
+        $this->artisan('mail:test', ['email' => 'cli@example.com'])
+            ->assertSuccessful();
+
+        Mail::assertSent(TestEmail::class, fn (TestEmail $mail) => $mail->hasTo('cli@example.com'));
     }
 
     private function makePdfBytes(): string

@@ -2,9 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Services\MailStatus;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Mail;
-use Throwable;
 
 class SendTestEmailCommand extends Command
 {
@@ -25,7 +24,7 @@ class SendTestEmailCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(): int
+    public function handle(MailStatus $mailStatus): int
     {
         $recipient = $this->argument('email') ?: $this->ask('Enter the recipient email address');
 
@@ -34,60 +33,50 @@ class SendTestEmailCommand extends Command
             return Command::FAILURE;
         }
 
-        $mailer = config('mail.default');
-        $fromAddress = config('mail.from.address');
-        $fromName = config('mail.from.name');
+        $status = $mailStatus->status();
 
         $this->info("=== Mail Configuration Test ===");
-        $this->line("Default Mailer: <comment>{$mailer}</comment>");
-        $this->line("From Address:   <comment>{$fromAddress} ({$fromName})</comment>");
+        $this->line("Default Mailer: <comment>{$status['mailer']}</comment>");
+        $this->line("From Address:   <comment>{$status['from_address']} ({$status['from_name']})</comment>");
 
-        if ($mailer === 'smtp') {
-            $host = config('mail.mailers.smtp.host');
-            $port = config('mail.mailers.smtp.port');
-            $scheme = config('mail.mailers.smtp.scheme') ?: 'none (STARTTLS)';
-            $user = config('mail.mailers.smtp.username') ? substr(config('mail.mailers.smtp.username'), 0, 4) . '***' : 'none';
-            $this->line("SMTP Host:      <comment>{$host}</comment>");
-            $this->line("SMTP Port:      <comment>{$port}</comment>");
-            $this->line("SMTP Scheme:    <comment>{$scheme}</comment>");
-            $this->line("SMTP Username:  <comment>{$user}</comment>");
+        if ($status['mailer'] === 'smtp') {
+            $this->line("SMTP Host:      <comment>{$status['host']}</comment>");
+            $this->line("SMTP Port:      <comment>{$status['port']}</comment>");
+            $this->line("SMTP Scheme:    <comment>{$status['scheme_label']}</comment>");
+            $this->line("SMTP Username:  <comment>" . ($status['username_masked'] ?? 'none') . "</comment>");
         }
 
         $this->newLine();
         $this->info("Sending test email to: {$recipient}...");
 
-        try {
-            Mail::send('emails.reset-password', [
-                'name' => 'Academic Hub Tester',
-                'email' => $recipient,
-                'url' => route('login'),
-            ], function ($message) use ($recipient) {
-                $message->to($recipient)
-                    ->subject('Test Email from Academic Hub');
-            });
+        $result = $mailStatus->sendTest($recipient, 'artisan mail:test');
 
+        if ($result['ok']) {
             $this->newLine();
             $this->info("✓ Test email dispatched successfully!");
             $this->line("Please check the inbox (and spam/junk folder) of: <comment>{$recipient}</comment>");
-            
-            if ($mailer === 'log') {
-                $this->warn("Note: MAIL_MAILER is currently set to 'log'. The email was written to storage/logs/laravel.log rather than sent over the internet.");
+
+            if ($result['is_local_only']) {
+                $this->warn("Note: MAIL_MAILER is currently set to '{$result['mailer']}'. The email was written to storage/logs/laravel.log rather than sent over the internet.");
             }
 
             return Command::SUCCESS;
-        } catch (Throwable $e) {
-            $this->newLine();
-            $this->error("✗ Failed to send test email:");
-            $this->line($e->getMessage());
+        }
 
+        $this->newLine();
+        $this->error("✗ Failed to send test email:");
+        $this->line($result['error'] ?? 'Unknown error');
+
+        if (! empty($result['tips'])) {
             $this->newLine();
             $this->warn("Troubleshooting Tips:");
-            $this->line("1. Port 465 requires SSL / smtps. In .env set: MAIL_PORT=465, MAIL_ENCRYPTION=ssl, MAIL_SCHEME=smtps");
-            $this->line("2. Port 587 requires TLS. In .env set: MAIL_PORT=587, MAIL_ENCRYPTION=tls, MAIL_SCHEME=smtp");
-            $this->line("3. Ensure MAIL_USERNAME matches the full email address (e.g. support@amgacademichub.com)");
-            $this->line("4. Check that MAIL_FROM_ADDRESS matches the authorized sending domain in cPanel.");
-
-            return Command::FAILURE;
+            foreach ($result['tips'] as $idx => $tip) {
+                $num = $idx + 1;
+                $this->line("{$num}. {$tip}");
+            }
         }
+
+        return Command::FAILURE;
     }
 }
+
