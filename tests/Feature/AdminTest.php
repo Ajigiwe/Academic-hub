@@ -354,6 +354,168 @@ class AdminTest extends TestCase
         $this->assertSame('ACTIVE', $this->admin->refresh()->status);
     }
 
+    public function test_admin_can_grant_admin_access_to_student(): void
+    {
+        $this->actingAs($this->admin)
+            ->post("/admin/students/{$this->student->id}/role", ['role' => 'ADMIN'])
+            ->assertRedirect();
+
+        $this->assertSame('ADMIN', $this->student->refresh()->role);
+        $this->assertTrue($this->student->isAdmin());
+
+        // The promoted user now has admin access.
+        $this->actingAs($this->student)->get('/admin')->assertOk();
+    }
+
+    public function test_admin_can_revoke_admin_access_from_user(): void
+    {
+        $secondaryAdmin = User::create([
+            'name' => 'Second Admin',
+            'first_name' => 'Second',
+            'last_name' => 'Admin',
+            'email' => 'second.admin@pastq.test',
+            'password' => 'Admin@123',
+            'role' => 'ADMIN',
+            'status' => 'ACTIVE',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/admin/students/{$secondaryAdmin->id}/role", ['role' => 'STUDENT'])
+            ->assertRedirect();
+
+        $this->assertSame('STUDENT', $secondaryAdmin->refresh()->role);
+        $this->assertFalse($secondaryAdmin->isAdmin());
+
+        // The demoted user now gets 404 on admin routes.
+        $this->actingAs($secondaryAdmin)->get('/admin')->assertNotFound();
+    }
+
+    public function test_admin_cannot_demote_themselves(): void
+    {
+        $this->actingAs($this->admin)
+            ->post("/admin/students/{$this->admin->id}/role", ['role' => 'STUDENT'])
+            ->assertRedirect();
+
+        $this->assertSame('ADMIN', $this->admin->refresh()->role);
+        $this->assertNotNull(session('error'));
+    }
+
+    public function test_cannot_demote_the_last_admin(): void
+    {
+        // Ensure only one admin exists
+        User::where('role', 'ADMIN')->where('id', '!=', $this->admin->id)->delete();
+        $this->assertSame(1, User::where('role', 'ADMIN')->count());
+
+        $secondary = User::create([
+            'name' => 'Other User',
+            'first_name' => 'Other',
+            'last_name' => 'User',
+            'email' => 'other@pastq.test',
+            'password' => 'Pass@123',
+            'role' => 'STUDENT',
+            'status' => 'ACTIVE',
+        ]);
+
+        // Attempting to demote the sole admin fails
+        $this->actingAs($this->admin)
+            ->post("/admin/students/{$this->admin->id}/role", ['role' => 'STUDENT'])
+            ->assertRedirect();
+
+        $this->assertSame('ADMIN', $this->admin->refresh()->role);
+    }
+
+    public function test_cannot_grant_admin_access_to_suspended_user(): void
+    {
+        $this->student->update(['status' => 'SUSPENDED']);
+
+        $this->actingAs($this->admin)
+            ->post("/admin/students/{$this->student->id}/role", ['role' => 'ADMIN'])
+            ->assertRedirect();
+
+        $this->assertSame('STUDENT', $this->student->refresh()->role);
+        $this->assertNotNull(session('error'));
+    }
+
+    public function test_admin_can_grant_admin_access_by_email(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/admin/students/grant-admin', ['email' => $this->student->email])
+            ->assertRedirect();
+
+        $this->assertSame('ADMIN', $this->student->refresh()->role);
+        $this->assertNotNull(session('status'));
+    }
+
+    public function test_grant_admin_by_email_validations(): void
+    {
+        // Non-existent email
+        $this->actingAs($this->admin)
+            ->post('/admin/students/grant-admin', ['email' => 'nonexistent@pastq.test'])
+            ->assertRedirect();
+        $this->assertNotNull(session('error'));
+
+        // Already an admin
+        $this->actingAs($this->admin)
+            ->post('/admin/students/grant-admin', ['email' => $this->admin->email])
+            ->assertRedirect();
+        $this->assertStringContainsString('already an administrator', (string) session('status'));
+
+        // Suspended user
+        $this->student->update(['status' => 'SUSPENDED']);
+        $this->actingAs($this->admin)
+            ->post('/admin/students/grant-admin', ['email' => $this->student->email])
+            ->assertRedirect();
+        $this->assertStringContainsString('suspended', (string) session('error'));
+        $this->assertSame('STUDENT', $this->student->refresh()->role);
+    }
+
+    public function test_guest_and_student_cannot_manage_admin_roles(): void
+    {
+        $this->post("/admin/students/{$this->student->id}/role", ['role' => 'ADMIN'])
+            ->assertRedirect('/login');
+        $this->post('/admin/students/grant-admin', ['email' => $this->student->email])
+            ->assertRedirect('/login');
+
+        $this->actingAs($this->student)
+            ->post("/admin/students/{$this->student->id}/role", ['role' => 'ADMIN'])
+            ->assertNotFound();
+        $this->actingAs($this->student)
+            ->post('/admin/students/grant-admin', ['email' => $this->student->email])
+            ->assertNotFound();
+    }
+
+    public function test_students_page_renders_users_with_role_filtering(): void
+    {
+        $targetAdmin = User::create([
+            'name' => 'Target Admin',
+            'first_name' => 'Target',
+            'last_name' => 'Admin',
+            'email' => 'target.admin@pastq.test',
+            'password' => 'Pass@123',
+            'role' => 'ADMIN',
+            'status' => 'ACTIVE',
+        ]);
+
+        $response = $this->actingAs($this->admin)->get('/admin/students');
+        $response->assertOk()
+            ->assertSee('Students')
+            ->assertSee('Grant administrator access')
+            ->assertSee($targetAdmin->email)
+            ->assertSee($this->student->email);
+
+        // Filter by role=ADMIN: target admin is visible, student is not
+        $this->actingAs($this->admin)->get('/admin/students?role=ADMIN')
+            ->assertOk()
+            ->assertSee($targetAdmin->email)
+            ->assertDontSee($this->student->email);
+
+        // Filter by role=STUDENT: student is visible, target admin is not
+        $this->actingAs($this->admin)->get('/admin/students?role=STUDENT')
+            ->assertOk()
+            ->assertSee($this->student->email)
+            ->assertDontSee($targetAdmin->email);
+    }
+
     // ── Late-upload backfill (the bulk-model guarantee) ──────────────
 
     public function test_publishing_new_paper_backfills_past_buyers(): void

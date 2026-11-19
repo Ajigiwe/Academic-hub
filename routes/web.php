@@ -149,6 +149,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/orders', [OrderAdminController::class, 'index'])->name('orders');
 
     Route::get('/students', [StudentAdminController::class, 'index'])->name('students');
+    Route::post('/students/grant-admin', [StudentAdminController::class, 'grantAdmin'])->name('students.grant-admin');
+    Route::post('/students/{user}/role', [StudentAdminController::class, 'setRole'])->name('students.role');
     Route::post('/students/{user}/status', [StudentAdminController::class, 'setStatus'])->name('students.status');
 
     // Free materials + programme visibility settings.
