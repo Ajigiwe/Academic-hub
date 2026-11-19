@@ -4,10 +4,10 @@ use App\Services\Payments\MockProvider;
 
 return [
     // "mock" = sandbox gateway, completes instantly, no real money.
-    // "paystack" = real gateway (Ghana card + mobile money).
+    // "moolre" = Moolre gateway (Ghana mobile money & card).
+    // "paystack" = Paystack gateway (Ghana card & mobile money).
     //
-    // Selecting a driver that is not configured (paystack without
-    // PAYSTACK_SECRET_KEY) falls back to the sandbox OUTSIDE production;
+    // Selecting a driver that is not configured falls back to the sandbox OUTSIDE production;
     // in production checkout fails rather than taking orders it cannot
     // charge for. See PaymentManager::provider().
     'provider' => env('PAYMENT_PROVIDER', 'mock'),
@@ -28,6 +28,14 @@ return [
         'trim',
         explode(',', (string) env('PAYMENT_TRUSTED_HOSTS', '')),
     ))),
+
+    'moolre' => [
+        'public_key' => env('MOOLRE_PUBLIC_KEY', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyaWQiOjExMTUxNywid2FsbGV0aWQiOiI3ODU5NiIsImV4cCI6MTk1NjUyNzk5OX0.XoebPda86h4yplp426-G_xDThIDT74d8ruNGDCJHzlM'),
+        'private_key' => env('MOOLRE_PRIVATE_KEY', 'nx5mGtSLJ4iXRlRqoW3rTqG7C4sRqSUq3nJU9O5ppCiHo5b1rD8WDEOtawlqTGmt'),
+        'username' => env('MOOLRE_USERNAME', ''),
+        'account_number' => env('MOOLRE_ACCOUNT_NUMBER', '78596'),
+        'base_url' => env('MOOLRE_BASE_URL', 'https://api.moolre.com'),
+    ],
 
     'paystack' => [
         // Secret key from the Paystack dashboard (sk_test_… / sk_live_…).

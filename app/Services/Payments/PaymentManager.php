@@ -21,6 +21,7 @@ class PaymentManager
     public function __construct(
         private readonly MockProvider $mock,
         private readonly PaystackProvider $paystack,
+        private readonly MoolreProvider $moolre,
     ) {}
 
     public function provider(?string $configured = null): PaymentProvider
@@ -139,6 +140,7 @@ class PaymentManager
         return match ($name) {
             'mock' => $this->mock,
             'paystack' => $this->paystack,
+            'moolre' => $this->moolre,
             default => null,
         };
     }
@@ -158,7 +160,7 @@ class PaymentManager
     /** Every registered provider (webhook scheme dispatch iterates these). */
     public function all(): array
     {
-        return [$this->paystack, $this->mock];
+        return [$this->moolre, $this->paystack, $this->mock];
     }
 
     private function resolve(string $name): PaymentProvider
@@ -166,8 +168,9 @@ class PaymentManager
         return match ($name) {
             '', 'mock' => $this->mock,
             'paystack' => $this->paystack,
+            'moolre' => $this->moolre,
             default => throw new \RuntimeException(
-                "Unknown PAYMENT_PROVIDER \"{$name}\". Expected \"mock\" or \"paystack\"."
+                "Unknown PAYMENT_PROVIDER \"{$name}\". Expected \"mock\", \"paystack\", or \"moolre\"."
             ),
         };
     }
@@ -177,6 +180,10 @@ class PaymentManager
     {
         if ($provider->name() === 'paystack') {
             return 'Paystack is not configured: set PAYSTACK_SECRET_KEY in the environment.';
+        }
+
+        if ($provider->name() === 'moolre') {
+            return 'Moolre is not configured: set MOOLRE_PUBLIC_KEY and MOOLRE_PRIVATE_KEY in the environment.';
         }
 
         if ($provider->mode() === 'sandbox' && app()->isProduction()) {

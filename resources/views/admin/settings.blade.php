@@ -10,10 +10,21 @@
 
     @php
         // How the live gateway is wired right now (PaymentManager::status).
-        $paymentsLive = $payments['effective'] === 'paystack' && $payments['effective_mode'] === 'live';
-        $paymentsTest = $payments['effective'] === 'paystack' && $payments['effective_mode'] === 'test';
+        $effective = $payments['effective'];
+        $effectiveMode = $payments['effective_mode'];
+        $paymentsLive = in_array($effective, ['paystack', 'moolre'], true) && $effectiveMode === 'live';
+        $paymentsTest = in_array($effective, ['paystack', 'moolre'], true) && $effectiveMode === 'test';
         $paymentsBadge = $paymentsLive ? 'badge-success' : ($paymentsTest ? 'badge-gold' : 'badge-neutral');
-        $paymentsLabel = $paymentsLive ? 'Paystack · live' : ($paymentsTest ? 'Paystack · test keys' : 'Sandbox · no real money');
+        $providerDisplayName = match ($effective) {
+            'moolre' => 'Moolre',
+            'paystack' => 'Paystack',
+            default => 'Sandbox',
+        };
+        $paymentsLabel = match (true) {
+            $paymentsLive => "{$providerDisplayName} · live",
+            $paymentsTest => "{$providerDisplayName} · test keys",
+            default => 'Sandbox · no real money',
+        };
     @endphp
 
     {{-- ── Payments gateway ────────────────────────────────────────── --}}
@@ -27,7 +38,7 @@
         </div>
 
         <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-            Checkout runs through {{ $payments['effective'] === 'paystack' ? 'Paystack (card and mobile money)' : 'the sandbox gateway' }},
+            Checkout runs through {{ match ($effective) { 'moolre' => 'Moolre (Mobile Money & Card)', 'paystack' => 'Paystack (card and mobile money)', default => 'the sandbox gateway' } }},
             and every payment is verified server-to-server before a paper unlocks. Keys live in the
             environment — never in this page or the database.
         </p>
@@ -55,7 +66,7 @@
                 </dd>
             </div>
             <div class="sm:col-span-2">
-                <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Webhook URL (paste into the Paystack dashboard)</dt>
+                <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Webhook URL (paste into {{ in_array($payments['selected'], ['moolre', 'paystack'], true) ? ucfirst($payments['selected']) : 'gateway' }} dashboard)</dt>
                 <dd class="mt-0.5 break-all font-mono text-xs text-neutral-900 dark:text-neutral-100">{{ $payments['webhook_url'] }}</dd>
             </div>
             <div class="sm:col-span-2">
@@ -69,6 +80,12 @@
                 Live keys are active: every checkout charges real money. Set
                 <span class="font-mono">PAYMENT_PROVIDER=mock</span> to run the sandbox instead.
             </p>
+        @elseif (! $payments['selected_ready'] && $payments['selected'] === 'moolre')
+            <p class="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
+                To switch to Moolre set <span class="font-mono">PAYMENT_PROVIDER=moolre</span>,
+                <span class="font-mono">MOOLRE_PUBLIC_KEY</span>, and <span class="font-mono">MOOLRE_PRIVATE_KEY</span>
+                in the environment, then click <strong>Reload .env config</strong>.
+            </p>
         @elseif (! $payments['selected_ready'] || $payments['selected'] !== 'paystack')
             <p class="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
                 To switch to Paystack set <span class="font-mono">PAYMENT_PROVIDER=paystack</span> and
@@ -79,8 +96,8 @@
 
         @if (! $payments['webhook_reachable'])
             <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
-                APP_URL points at localhost, so Paystack cannot deliver webhooks to this machine — expose it
-                through a tunnel or a deployment and use that public URL above.
+                APP_URL points at localhost, so external gateways cannot deliver webhooks to this machine — expose it
+                through a tunnel or a live deployment and set APP_URL to that public domain.
             </p>
         @endif
     </section>

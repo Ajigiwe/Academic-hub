@@ -53,7 +53,7 @@ class PaymentWebhookController extends Controller
             return response()->json(['error' => 'Invalid JSON.'], 400);
         }
 
-        $event = $body['event'] ?? null;
+        $event = $body['event'] ?? $body['code'] ?? null;
         if (! is_string($event) || $event === '') {
             return response()->json(['error' => 'Missing event/reference.'], 400);
         }

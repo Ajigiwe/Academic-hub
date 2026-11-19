@@ -118,6 +118,41 @@ class PaymentWiringTest extends TestCase
         $this->assertSame('live', $paystack->mode());
     }
 
+    public function test_the_configured_keys_make_moolre_the_effective_provider(): void
+    {
+        config([
+            'payments.provider' => 'moolre',
+            'payments.moolre.public_key' => 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyaWQiOjExMTUxNywid2FsbGV0aWQiOiI3ODU5NiIsImV4cCI6MTk1NjUyNzk5OX0.XoebPda86h4yplp426-G_xDThIDT74d8ruNGDCJHzlM',
+            'payments.moolre.private_key' => 'nx5mGtSLJ4iXRlRqoW3rTqG7C4sRqSUq3nJU9O5ppCiHo5b1rD8WDEOtawlqTGmt',
+        ]);
+
+        $status = app(PaymentManager::class)->status();
+
+        $this->assertSame('moolre', $status['selected']);
+        $this->assertSame('moolre', $status['effective']);
+        $this->assertSame('live', $status['effective_mode']);
+        $this->assertTrue($status['selected_ready']);
+        $this->assertFalse($status['falling_back']);
+        $this->assertNull($status['note']);
+    }
+
+    public function test_moolre_selected_without_keys_refuses_checkout_in_production(): void
+    {
+        $this->inProduction();
+        config([
+            'payments.provider' => 'moolre',
+            'payments.moolre.public_key' => '',
+            'payments.moolre.private_key' => '',
+        ]);
+
+        $this->actingAs($this->student);
+        $response = $this->post('/checkout', ['bundle_id' => $this->bundle->id]);
+
+        $response->assertSessionHasErrors('bundle');
+        $this->assertSame('CANCELLED', Order::sole()->status);
+        $this->assertSame(0, Payment::count());
+    }
+
     // ── The sandbox in a live environment ─────────────────────────────
 
     public function test_sandbox_is_shut_down_in_production_on_the_public_dev_secret(): void
