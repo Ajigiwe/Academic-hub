@@ -67,9 +67,16 @@
                 <span class="label">Description (optional)</span>
                 <input name="description" maxlength="2000" class="input text-sm">
             </label>
-            <label>
-                <span class="label">PDF (max 30 MB)</span>
-                <input type="file" name="file" accept="application/pdf" required class="text-xs">
+            <label class="sm:col-span-2 lg:col-span-4">
+                <span class="label">Document (PDF or image files · multiple supported)</span>
+                <input type="file" name="files[]" multiple accept="application/pdf,image/jpeg,image/png,image/webp" required class="text-xs" data-file-preview>
+                <span class="mt-1 block text-xs text-neutral-500">
+                    Upload a PDF or select multiple image files (JPG, PNG, WebP) to compile them into a clear multi-page document in order. Max 30 MB per file.
+                </span>
+                <div class="file-preview-zone mt-2.5 hidden rounded-lg border border-neutral-200 bg-neutral-50 p-2.5 dark:border-neutral-800 dark:bg-neutral-900/60">
+                    <p class="file-preview-summary text-xs font-semibold text-neutral-700 dark:text-neutral-300"></p>
+                    <div class="file-preview-items mt-2 flex flex-wrap gap-2"></div>
+                </div>
             </label>
             <div class="sm:col-span-2 lg:col-span-4">
                 <button class="btn-primary">Publish free material</button>
@@ -132,4 +139,49 @@
         </table>
     </div>
     <div class="mt-4">{{ $materials->links() }}</div>
+
+    @push('scripts')
+        <script>
+            document.addEventListener('change', function (e) {
+                if (!e.target.matches('input[data-file-preview]')) return;
+                var input = e.target;
+                var container = input.closest('form, label, div').querySelector('.file-preview-zone');
+                if (!container) return;
+                var summary = container.querySelector('.file-preview-summary');
+                var items = container.querySelector('.file-preview-items');
+                items.innerHTML = '';
+                var files = Array.from(input.files || []);
+                if (files.length === 0) {
+                    container.classList.add('hidden');
+                    return;
+                }
+                container.classList.remove('hidden');
+                var isMulti = files.length > 1;
+                summary.textContent = files.length + ' file' + (files.length === 1 ? '' : 's') + ' selected' + (isMulti ? ' · compiled into a multi-page document in this order:' : ':');
+                files.forEach(function (file, idx) {
+                    var card = document.createElement('div');
+                    card.className = 'flex items-center gap-2 rounded-md border border-neutral-200 bg-white p-1.5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800';
+                    var isImg = file.type.startsWith('image/');
+                    var thumb = document.createElement('div');
+                    thumb.className = 'flex h-12 w-12 shrink-0 items-center justify-center rounded bg-neutral-100 overflow-hidden text-[10px] font-bold text-neutral-500 dark:bg-neutral-700';
+                    if (isImg) {
+                        var img = document.createElement('img');
+                        img.src = URL.createObjectURL(file);
+                        img.className = 'h-full w-full object-cover';
+                        thumb.appendChild(img);
+                    } else {
+                        thumb.textContent = 'PDF';
+                    }
+                    var meta = document.createElement('div');
+                    meta.className = 'min-w-0 pr-1 text-left';
+                    meta.innerHTML = '<span class="inline-block rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-bold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">Page ' + (idx + 1) + '</span>' +
+                        '<p class="truncate text-xs font-medium text-neutral-800 dark:text-neutral-200 max-w-[130px]">' + file.name + '</p>' +
+                        '<p class="text-[10px] text-neutral-400">' + (file.size ? (file.size / 1024).toFixed(0) + ' KB' : '') + '</p>';
+                    card.appendChild(thumb);
+                    card.appendChild(meta);
+                    items.appendChild(card);
+                });
+            });
+        </script>
+    @endpush
 @endsection

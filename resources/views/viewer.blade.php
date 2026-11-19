@@ -203,7 +203,14 @@
         overflow: hidden;
     }
     .pdf-page:last-child { margin-bottom: 0; }
-    .pdf-page canvas { display: block; user-select: none; -webkit-user-select: none; }
+    .pdf-page canvas {
+        display: block;
+        user-select: none;
+        -webkit-user-select: none;
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+        image-rendering: auto;
+    }
     .pdf-page-label {
         position: absolute;
         inset: 0;

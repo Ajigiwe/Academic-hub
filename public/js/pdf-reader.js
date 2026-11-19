@@ -223,7 +223,7 @@
         var n = Number(entry.el.getAttribute('data-page'));
         if (tasks[n]) return;
 
-        var ratio = Math.min(window.devicePixelRatio || 1, 2);
+        var ratio = Math.min(window.devicePixelRatio || 1, 3);
 
         tasks[n] = doc.getPage(n).then(function (page) {
             var viewport = page.getViewport({ scale: fit * zoom * ratio });
@@ -234,6 +234,8 @@
             canvas.style.height = Math.round(entry.base.height * fit * zoom) + 'px';
 
             var context = canvas.getContext('2d', { alpha: false });
+            context.imageSmoothingEnabled = true;
+            context.imageSmoothingQuality = 'high';
             context.fillStyle = '#ffffff';
             context.fillRect(0, 0, canvas.width, canvas.height);
 

@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\{Bundle, Programme, Resource, ResourceFile};
+use App\Services\Documents\DocumentCompiler;
 use App\Services\Documents\DocumentStore;
 use App\Services\Documents\PdfWatermarker;
 use App\Services\Payments\EntitlementBackfill;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class PaperAdminController extends Controller
 {
@@ -130,29 +132,47 @@ class PaperAdminController extends Controller
             ->with('status', "Paper \"{$title}\" deleted.");
     }
 
-    /** Upload one PDF as a new DRAFT paper inside a bundle. */
-    public function storeFile(Request $request, DocumentStore $store, PdfWatermarker $probe)
+    /** Upload one or more PDFs/images as a new DRAFT paper inside a bundle. */
+    public function storeFile(Request $request, DocumentStore $store, DocumentCompiler $compiler)
     {
+        $uploaded = $request->file('files');
+        if (! $uploaded) {
+            $single = $request->file('file');
+            $uploaded = $single ? (is_array($single) ? $single : [$single]) : [];
+        }
+
+        $request->merge(['_has_files' => ! empty($uploaded)]);
+
         $data = $request->validate([
             'bundle_id' => ['required', 'integer', 'exists:bundles,id'],
             'title' => ['required', 'string', 'max:255'],
             'semester' => ['required', 'integer', Rule::in([1, 2])],
-            'file' => ['required', 'file', 'max:'.(self::MAX_UPLOAD_BYTES / 1024), 'mimes:pdf'],
+            '_has_files' => ['accepted'],
+            'file' => ['nullable', 'file', 'max:'.(self::MAX_UPLOAD_BYTES / 1024), 'mimes:pdf,jpg,jpeg,png,webp'],
+            'files' => ['nullable', 'array', 'min:1'],
+            'files.*' => ['file', 'max:'.(self::MAX_UPLOAD_BYTES / 1024), 'mimes:pdf,jpg,jpeg,png,webp'],
+        ], [
+            '_has_files.accepted' => 'Please select at least one document or image file to upload.',
+            'file.mimes' => 'The uploaded file must be a PDF or image (JPG, PNG, WebP).',
+            'files.*.mimes' => 'Each uploaded file must be a PDF or image (JPG, PNG, WebP).',
         ]);
 
         $bundle = Bundle::findOrFail($data['bundle_id']);
-        $uploaded = $request->file('file');
 
-        $bytes = file_get_contents($uploaded->getRealPath());
-        $pageCount = $probe->pageCount($bytes);
-        if ($pageCount === 0) {
-            return back()->with('error', 'The file could not be read as a PDF.');
+        try {
+            $compiled = $compiler->compile($uploaded);
+        } catch (Throwable $e) {
+            return back()->with('error', 'Could not process upload: '.$e->getMessage());
         }
+
+        $bytes = $compiled['bytes'];
+        $pageCount = $compiled['page_count'];
+        $originalName = $compiled['original_name'];
 
         $key = $store->buildStorageKey();
         $store->put($key, $bytes);
 
-        DB::transaction(function () use ($request, $store, $bundle, $data, $key, $bytes, $pageCount, $uploaded) {
+        DB::transaction(function () use ($bundle, $data, $key, $bytes, $pageCount, $originalName) {
             $resource = Resource::create([
                 'slug' => $this->uniqueSlug($data['title']),
                 'title' => $data['title'],
@@ -163,7 +183,7 @@ class PaperAdminController extends Controller
                 'semester' => $data['semester'],
                 'academic_year' => $bundle->academic_year,
                 'page_count' => $pageCount,
-                'preview_pages' => 2,
+                'preview_pages' => min(2, $pageCount),
                 'bundle_id' => $bundle->id,
                 'programme_id' => $bundle->programme_id,
                 'course_id' => $bundle->course_id,
@@ -174,47 +194,65 @@ class PaperAdminController extends Controller
                 'mime_type' => 'application/pdf',
                 'size_bytes' => strlen($bytes),
                 'checksum' => hash('sha256', $bytes),
-                'original_name' => $uploaded->getClientOriginalName(),
+                'original_name' => $originalName,
                 'is_current' => true,
             ]);
         });
 
         return redirect()
             ->route('admin.papers')
-            ->with('status', "Paper \"{$data['title']}\" uploaded as a draft ({$pageCount} pages). Publish it when ready.");
+            ->with('status', "Paper \"{$data['title']}\" uploaded as a draft ({$pageCount} page".($pageCount === 1 ? '' : 's').'). Publish it when ready.');
     }
 
-    /** Replace the current PDF of an existing paper (versioning). */
-    public function replaceFile(Request $request, Resource $resource, DocumentStore $store, PdfWatermarker $probe)
+    /** Replace the current file of an existing paper with a PDF or image(s). */
+    public function replaceFile(Request $request, Resource $resource, DocumentStore $store, DocumentCompiler $compiler)
     {
-        $data = $request->validate([
-            'file' => ['required', 'file', 'max:'.(self::MAX_UPLOAD_BYTES / 1024), 'mimes:pdf'],
+        $uploaded = $request->file('files');
+        if (! $uploaded) {
+            $single = $request->file('file');
+            $uploaded = $single ? (is_array($single) ? $single : [$single]) : [];
+        }
+
+        $request->merge(['_has_files' => ! empty($uploaded)]);
+
+        $request->validate([
+            '_has_files' => ['accepted'],
+            'file' => ['nullable', 'file', 'max:'.(self::MAX_UPLOAD_BYTES / 1024), 'mimes:pdf,jpg,jpeg,png,webp'],
+            'files' => ['nullable', 'array', 'min:1'],
+            'files.*' => ['file', 'max:'.(self::MAX_UPLOAD_BYTES / 1024), 'mimes:pdf,jpg,jpeg,png,webp'],
+        ], [
+            '_has_files.accepted' => 'Please select at least one document or image file to upload.',
+            'file.mimes' => 'The uploaded file must be a PDF or image (JPG, PNG, WebP).',
+            'files.*.mimes' => 'Each uploaded file must be a PDF or image (JPG, PNG, WebP).',
         ]);
 
-        $uploaded = $request->file('file');
-        $bytes = file_get_contents($uploaded->getRealPath());
-        $pageCount = $probe->pageCount($bytes);
-        if ($pageCount === 0) {
-            return back()->with('error', 'The file could not be read as a PDF.');
+        try {
+            $compiled = $compiler->compile($uploaded);
+        } catch (Throwable $e) {
+            return back()->with('error', 'Could not process upload: '.$e->getMessage());
         }
+
+        $bytes = $compiled['bytes'];
+        $pageCount = $compiled['page_count'];
+        $originalName = $compiled['original_name'];
 
         $key = $store->buildStorageKey();
         $store->put($key, $bytes);
 
-        DB::transaction(function () use ($resource, $key, $bytes, $pageCount, $uploaded) {
+        DB::transaction(function () use ($resource, $key, $bytes, $pageCount, $originalName) {
             $resource->files()->update(['is_current' => false]);
             $resource->files()->create([
                 'storage_key' => $key,
                 'mime_type' => 'application/pdf',
                 'size_bytes' => strlen($bytes),
                 'checksum' => hash('sha256', $bytes),
-                'original_name' => $uploaded->getClientOriginalName(),
+                'original_name' => $originalName,
                 'is_current' => true,
             ]);
             $resource->update(['page_count' => $pageCount]);
         });
 
-        return back()->with('status', "PDF replaced ({$pageCount} pages).");
+        return back()->with('status', "Document replaced ({$pageCount} page".($pageCount === 1 ? '' : 's').').');
     }
 
     private function uniqueSlug(string $title): string

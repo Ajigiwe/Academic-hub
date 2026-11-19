@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Programme;
 use App\Models\Resource;
+use App\Services\Documents\DocumentCompiler;
 use App\Services\Documents\DocumentStore;
 use App\Services\Documents\PdfWatermarker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 /**
  * Admin free-material uploads — port of uploadFreeMaterial
@@ -34,8 +36,16 @@ class MaterialAdminController extends Controller
         ]);
     }
 
-    public function store(Request $request, DocumentStore $store, PdfWatermarker $probe)
+    public function store(Request $request, DocumentStore $store, DocumentCompiler $compiler)
     {
+        $uploaded = $request->file('files');
+        if (! $uploaded) {
+            $single = $request->file('file');
+            $uploaded = $single ? (is_array($single) ? $single : [$single]) : [];
+        }
+
+        $request->merge(['_has_files' => ! empty($uploaded)]);
+
         $data = $request->validate([
             'title' => ['required', 'string', 'min:6', 'max:160'],
             'description' => ['nullable', 'string', 'max:2000'],
@@ -45,23 +55,33 @@ class MaterialAdminController extends Controller
             'course_code' => ['required', 'string', 'min:2', 'max:20'],
             'course_title' => ['required', 'string', 'min:3', 'max:120'],
             'programme' => ['required', 'string', 'exists:programmes,name'],
-            'file' => ['required', 'file', 'max:'.(self::MAX_UPLOAD_BYTES / 1024), 'mimes:pdf'],
+            '_has_files' => ['accepted'],
+            'file' => ['nullable', 'file', 'max:'.(self::MAX_UPLOAD_BYTES / 1024), 'mimes:pdf,jpg,jpeg,png,webp'],
+            'files' => ['nullable', 'array', 'min:1'],
+            'files.*' => ['file', 'max:'.(self::MAX_UPLOAD_BYTES / 1024), 'mimes:pdf,jpg,jpeg,png,webp'],
+        ], [
+            '_has_files.accepted' => 'Please select at least one document or image file to upload.',
+            'file.mimes' => 'The uploaded file must be a PDF or image (JPG, PNG, WebP).',
+            'files.*.mimes' => 'Each uploaded file must be a PDF or image (JPG, PNG, WebP).',
         ]);
 
         $programme = Programme::where('name', $data['programme'])->firstOrFail();
 
-        $uploaded = $request->file('file');
-        $bytes = file_get_contents($uploaded->getRealPath());
-        $pageCount = $probe->pageCount($bytes);
-        if ($pageCount === 0) {
-            return back()->with('error', 'The file could not be read as a PDF.');
+        try {
+            $compiled = $compiler->compile($uploaded);
+        } catch (Throwable $e) {
+            return back()->with('error', 'Could not process upload: '.$e->getMessage());
         }
+
+        $bytes = $compiled['bytes'];
+        $pageCount = $compiled['page_count'];
+        $originalName = $compiled['original_name'];
 
         $course = $this->upsertCourse($data['course_code'], $data['course_title']);
         $key = $store->buildStorageKey();
         $store->put($key, $bytes);
 
-        DB::transaction(function () use ($data, $programme, $course, $key, $bytes, $pageCount, $uploaded) {
+        DB::transaction(function () use ($data, $programme, $course, $key, $bytes, $pageCount, $originalName) {
             $resource = Resource::create([
                 'slug' => $this->uniqueSlug($data['title']),
                 'title' => $data['title'],
@@ -84,14 +104,14 @@ class MaterialAdminController extends Controller
                 'mime_type' => 'application/pdf',
                 'size_bytes' => strlen($bytes),
                 'checksum' => hash('sha256', $bytes),
-                'original_name' => $uploaded->getClientOriginalName(),
+                'original_name' => $originalName,
                 'is_current' => true,
             ]);
         });
 
         return redirect()
             ->route('admin.materials')
-            ->with('status', "\"{$data['title']}\" published as a free download.");
+            ->with('status', "\"{$data['title']}\" published as a free download ({$pageCount} page".($pageCount === 1 ? '' : 's').').');
     }
 
     /** Course by code — created on first use, title kept in sync. */

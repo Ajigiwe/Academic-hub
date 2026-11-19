@@ -240,6 +240,129 @@ class AdminTest extends TestCase
         $this->assertNotNull(session('error'));
     }
 
+    public function test_admin_can_upload_image_as_draft_paper(): void
+    {
+        Storage::fake('local');
+
+        $img = $this->makeImageFile('exam-photo.jpg', 600, 800);
+
+        try {
+            $response = $this->actingAs($this->admin)->post('/admin/papers', [
+                'bundle_id' => $this->bundle->id,
+                'title' => 'ACC 102 · Photo Exam Paper',
+                'semester' => '1',
+                'files' => [$img],
+            ]);
+
+            $response->assertRedirect();
+
+            $paper = Resource::where('title', 'ACC 102 · Photo Exam Paper')->first();
+            $this->assertNotNull($paper);
+            $this->assertSame('DRAFT', $paper->status);
+            $this->assertSame(1, $paper->page_count);
+            $this->assertTrue($paper->files()->where('is_current', true)->exists());
+        } finally {
+            @unlink($img->getRealPath());
+        }
+    }
+
+    public function test_admin_can_upload_multiple_images_compiled_into_multipage_paper(): void
+    {
+        Storage::fake('local');
+
+        $p1 = $this->makeImageFile('page1.jpg', 600, 800);
+        $p2 = $this->makeImageFile('page2.png', 600, 800);
+        $p3 = $this->makeImageFile('page3.jpg', 600, 800);
+
+        try {
+            $response = $this->actingAs($this->admin)->post('/admin/papers', [
+                'bundle_id' => $this->bundle->id,
+                'title' => 'ACC 102 · 3-Page Scanned Exam',
+                'semester' => '2',
+                'files' => [$p1, $p2, $p3],
+            ]);
+
+            $response->assertRedirect();
+
+            $paper = Resource::where('title', 'ACC 102 · 3-Page Scanned Exam')->first();
+            $this->assertNotNull($paper);
+            $this->assertSame('DRAFT', $paper->status);
+            $this->assertSame(3, $paper->page_count, 'All 3 images must be compiled into a 3-page document.');
+            $this->assertTrue($paper->files()->where('is_current', true)->exists());
+        } finally {
+            @unlink($p1->getRealPath());
+            @unlink($p2->getRealPath());
+            @unlink($p3->getRealPath());
+        }
+    }
+
+    public function test_admin_can_replace_paper_with_multiple_images(): void
+    {
+        Storage::fake('local');
+
+        $paper = $this->bundle->resources->first();
+        $p1 = $this->makeImageFile('replacement1.jpg', 600, 800);
+        $p2 = $this->makeImageFile('replacement2.jpg', 600, 800);
+
+        try {
+            $response = $this->actingAs($this->admin)->post("/admin/papers/{$paper->id}/replace", [
+                'files' => [$p1, $p2],
+            ]);
+
+            $response->assertRedirect();
+            $paper->refresh();
+            $this->assertSame(2, $paper->page_count);
+        } finally {
+            @unlink($p1->getRealPath());
+            @unlink($p2->getRealPath());
+        }
+    }
+
+    public function test_admin_can_upload_free_material_with_multiple_images(): void
+    {
+        Storage::fake('local');
+
+        $p1 = $this->makeImageFile('slides1.jpg', 800, 600);
+        $p2 = $this->makeImageFile('slides2.jpg', 800, 600);
+
+        try {
+            $response = $this->actingAs($this->admin)->post('/admin/materials', [
+                'title' => 'MKT 101 Lecture Slides Week 1',
+                'description' => 'Scanned lecture slides from week 1.',
+                'type' => 'SLIDES',
+                'level' => 100,
+                'semester' => 1,
+                'course_code' => 'MKT 101',
+                'course_title' => 'Principles of Marketing',
+                'programme' => 'Accounting',
+                'files' => [$p1, $p2],
+            ]);
+
+            $response->assertRedirect();
+            $material = Resource::where('title', 'MKT 101 Lecture Slides Week 1')->first();
+            $this->assertNotNull($material);
+            $this->assertSame('PUBLISHED', $material->status);
+            $this->assertSame(2, $material->page_count);
+        } finally {
+            @unlink($p1->getRealPath());
+            @unlink($p2->getRealPath());
+        }
+    }
+
+    public function test_unsupported_file_extension_is_rejected(): void
+    {
+        $upload = UploadedFile::fake()->create('malicious.exe', 100);
+
+        $response = $this->actingAs($this->admin)->post('/admin/papers', [
+            'bundle_id' => $this->bundle->id,
+            'title' => 'Invalid Extension Paper',
+            'semester' => '1',
+            'file' => $upload,
+        ]);
+
+        $response->assertSessionHasErrors(['file']);
+    }
+
     // ── Paper detail / edit page ─────────────────────────────────────
 
     public function test_admin_can_open_paper_edit_page(): void
@@ -895,5 +1018,10 @@ class AdminTest extends TestCase
         $pdf->Text(50, 50, 'Admin upload test');
 
         return (string) $pdf->Output('', 'S');
+    }
+
+    private function makeImageFile(string $name = 'page.jpg', int $w = 400, int $h = 600): \Illuminate\Http\UploadedFile
+    {
+        return \Illuminate\Http\UploadedFile::fake()->image($name, $w, $h);
     }
 }
