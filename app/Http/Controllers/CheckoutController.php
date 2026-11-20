@@ -109,7 +109,9 @@ class CheckoutController extends Controller
                     'The payment provider rejected your account email address. Update it in your profile to a real, working inbox and try again.',
                 str_contains($reason, 'paystack_secret_key') =>
                     'Card and mobile-money payments are not available right now. Please try again later.',
-                default => 'Could not start the payment. Please try again.',
+                str_contains($reason, 'authentication error') || str_contains($reason, 'ain01') =>
+                    'Payment gateway authentication error: please verify that MOOLRE_USERNAME in .env matches your Moolre account username.',
+                default => 'Could not start the payment: ' . $e->getMessage(),
             };
 
             return back()->withErrors(['bundle' => $message]);

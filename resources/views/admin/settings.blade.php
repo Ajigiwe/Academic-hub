@@ -65,6 +65,20 @@
                     {{ $payments['sandbox_available'] ? 'Available at /payment/mock-checkout' : 'Disabled' }}
                 </dd>
             </div>
+            @if ($payments['selected'] === 'moolre')
+                <div>
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Moolre Username (X-API-USER)</dt>
+                    <dd class="mt-0.5 font-mono text-xs text-neutral-900 dark:text-neutral-100">
+                        {{ config('payments.moolre.username') ?: '(not set — check Moolre dashboard)' }}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Wallet Account Number</dt>
+                    <dd class="mt-0.5 font-mono text-xs text-neutral-900 dark:text-neutral-100">
+                        {{ config('payments.moolre.account_number') ?: '(not set)' }}
+                    </dd>
+                </div>
+            @endif
             <div class="sm:col-span-2">
                 <dt class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Webhook URL (paste into {{ in_array($payments['selected'], ['moolre', 'paystack'], true) ? ucfirst($payments['selected']) : 'gateway' }} dashboard)</dt>
                 <dd class="mt-0.5 break-all font-mono text-xs text-neutral-900 dark:text-neutral-100">{{ $payments['webhook_url'] }}</dd>

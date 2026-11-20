@@ -119,7 +119,9 @@ class MoolreProvider implements PaymentProvider
             'externalref' => $orderRef,
             'reusable' => '0',
             'callback' => $webhookUrl,
+            'callback_url' => $webhookUrl,
             'redirect' => $callbackUrl,
+            'redirect_url' => $callbackUrl,
             'metadata' => [
                 'orderRef' => $orderRef,
                 'email' => $customerEmail,
