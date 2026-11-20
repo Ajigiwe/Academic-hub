@@ -32,11 +32,11 @@ return [
     ))),
 
     'moolre' => [
-        'public_key' => env('MOOLRE_PUBLIC_KEY', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyaWQiOjExMTUxNywid2FsbGV0aWQiOiI3ODU5NiIsImV4cCI6MTk1NjU2NzU5OX0.XoebPda86h4yplp426-G_xDThIDT74d8ruNGDCJHzlM'),
-        'private_key' => env('MOOLRE_PRIVATE_KEY', 'lHIGquwg2NjLa9zpEIWM7oBZFtdbpA7fBQNujYHkVvMxcr5zeg9fdbh2w2pfXeDH'),
+        'public_key' => env('MOOLRE_PUBLIC_KEY', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyaWQiOjExMTUxNywid2FsbGV0aWQiOiI3ODU5NiIsImV4cCI6MTk1NjUyNzk5OX0.XoebPda86h4yplp426-G_xDThIDT74d8ruNGDCJHzlM'),
+        'private_key' => env('MOOLRE_PRIVATE_KEY', 'd2KbMdnLkuNlBRlqW4CCDLCtWddFGIc11L257ZMJOGkt9PERblUl4s8LHxiVZtUk'),
         'username' => env('MOOLRE_USERNAME', 'amgacademichub'),
-        'account_number' => env('MOOLRE_ACCOUNT_NUMBER', '78596'),
-        'base_url' => env('MOOLRE_BASE_URL', 'https://api.moolre.com'),
+        'account_number' => env('MOOLRE_ACCOUNT_NUMBER', '11151706078570'),
+        'base_url' => env('MOOLRE_BASE_URL', 'https://sandbox.moolre.com'),
     ],
 
     'paystack' => [

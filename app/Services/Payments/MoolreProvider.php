@@ -132,9 +132,9 @@ class MoolreProvider implements PaymentProvider
         ];
 
         try {
-            $response = $this->request('POST', '/embed/src/start', $payload);
-        } catch (\Throwable $e) {
             $response = $this->request('POST', '/embed/link', $payload);
+        } catch (\Throwable $e) {
+            $response = $this->request('POST', '/embed/src/start', $payload);
         }
 
         $data = $response['data'] ?? [];
@@ -339,8 +339,15 @@ class MoolreProvider implements PaymentProvider
             'Accept' => 'application/json',
             'X-API-USER' => $this->username(),
             'X-API-PUBKEY' => $this->configuredPublicKey(),
-            'X-API-KEY' => $this->configuredPrivateKey(),
         ];
+
+        // Only include private key for endpoints that require it (e.g. transfers/payouts/account status)
+        if (str_starts_with($path, '/open/account/status') || str_starts_with($path, '/open/transfer/')) {
+            $privateKey = $this->configuredPrivateKey();
+            if ($privateKey !== '') {
+                $headers['X-API-KEY'] = $privateKey;
+            }
+        }
 
         $http = Http::withHeaders($headers)
             ->baseUrl($baseUrl)
