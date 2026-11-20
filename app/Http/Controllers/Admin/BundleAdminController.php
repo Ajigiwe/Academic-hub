@@ -4,9 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Bundle;
+use App\Models\Course;
+use App\Models\Programme;
+use App\Services\BundlePricing;
 use App\Services\Payments\EntitlementBackfill;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class BundleAdminController extends Controller
 {
@@ -18,7 +23,100 @@ class BundleAdminController extends Controller
                 ->withExists(['resources' => fn ($q) => $q->where('status', '!=', 'PUBLISHED')->whereNull('published_at')])
                 ->orderByDesc('created_at')
                 ->paginate(20),
+            'programmes' => Programme::orderBy('name')->get(),
+            'courses' => Course::orderBy('code')->get(),
         ]);
+    }
+
+    /**
+     * Create a new past question bundle.
+     */
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'programme_id' => ['nullable', 'integer', 'exists:programmes,id'],
+            'programme_name' => ['nullable', 'string', 'max:120'],
+            'course_code' => ['required', 'string', 'max:30'],
+            'course_title' => ['required', 'string', 'max:255'],
+            'level' => ['required', 'integer', 'in:100,200,300,400'],
+            'academic_year' => ['required', 'string', 'max:20'],
+            'title' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+        ]);
+
+        // Resolve or create Programme
+        $programme = null;
+        if (!empty($data['programme_id'])) {
+            $programme = Programme::find($data['programme_id']);
+        }
+        if (!$programme && !empty($data['programme_name'])) {
+            $name = trim($data['programme_name']);
+            $programme = Programme::firstOrCreate(
+                ['name' => $name],
+                ['slug' => Str::slug($name)]
+            );
+        }
+        if (!$programme) {
+            $programme = Programme::first() ?? Programme::create([
+                'name' => 'General Studies',
+                'slug' => 'general-studies',
+            ]);
+        }
+
+        // Resolve or create Course
+        $code = strtoupper(trim($data['course_code']));
+        $courseTitle = trim($data['course_title']);
+        $course = Course::firstOrCreate(
+            ['code' => $code],
+            [
+                'title' => $courseTitle,
+                'slug' => Str::slug("{$code} {$courseTitle}"),
+            ]
+        );
+
+        $academicYear = trim($data['academic_year']);
+        $level = (int) $data['level'];
+
+        $bundleTitle = !empty($data['title'])
+            ? trim($data['title'])
+            : "{$course->code} — {$course->title} · {$academicYear} Past Questions";
+
+        $baseSlug = Str::slug("{$course->code}-{$academicYear}");
+        $slug = $baseSlug;
+        $counter = 1;
+        while (Bundle::where('slug', $slug)->exists()) {
+            $slug = "{$baseSlug}-{$counter}";
+            $counter++;
+        }
+
+        $bundle = Bundle::create([
+            'slug' => $slug,
+            'title' => $bundleTitle,
+            'description' => !empty($data['description'])
+                ? trim($data['description'])
+                : "Past questions and study papers for {$course->code} ({$academicYear}).",
+            'level' => $level,
+            'academic_year' => $academicYear,
+            'price_pesewas' => BundlePricing::pesewas(),
+            'programme_id' => $programme->id,
+            'course_id' => $course->id,
+            'status' => 'DRAFT',
+        ]);
+
+        return back()->with('status', "Bundle \"{$bundle->title}\" created. You can now attach papers to it.");
+    }
+
+    /**
+     * Populate starter courses and bundles from PastqSeeder.
+     */
+    public function seed()
+    {
+        Artisan::call('db:seed', [
+            '--class' => 'Database\\Seeders\\PastqSeeder',
+            '--force' => true,
+        ]);
+
+        return back()->with('status', 'Starter courses and bundles have been loaded successfully into the catalogue.');
     }
 
     /**

@@ -13,7 +13,20 @@
                 page, then publish the bundle here to put everything on sale.
             </p>
         </div>
-        <a href="{{ route('admin.papers') }}" class="btn-primary btn-sm">Upload papers</a>
+        <div class="flex flex-wrap items-center gap-2">
+            @if ($bundles->isEmpty())
+                <form method="POST" action="{{ route('admin.bundles.seed') }}" class="inline">
+                    @csrf
+                    <button type="submit" class="btn-secondary btn-sm" onclick="return confirm('Populate default programmes, courses and bundles?')">
+                        Load Starter Catalog
+                    </button>
+                </form>
+            @endif
+            <button type="button" onclick="openNewBundleModal()" class="btn-primary btn-sm">
+                + Create Bundle
+            </button>
+            <a href="{{ route('admin.papers') }}" class="btn-secondary btn-sm">Upload papers</a>
+        </div>
     </div>
 
     <div class="mt-6 flex flex-wrap items-baseline justify-between gap-2">
@@ -106,10 +119,19 @@
             <div class="card px-6 py-14 text-center xl:col-span-2">
                 <p class="font-semibold text-neutral-800 dark:text-neutral-100">No bundles yet</p>
                 <p class="mx-auto mt-1 max-w-md text-sm text-neutral-600 dark:text-neutral-400">
-                    Upload your first batch of papers from the Papers page — a bundle is created per course and
-                    academic year, then published from here.
+                    A bundle represents a course + academic year of past questions. Create your first bundle or populate the starter catalogue to begin uploading papers.
                 </p>
-                <a href="{{ route('admin.papers') }}" class="btn-primary mt-4">Upload papers</a>
+                <div class="mt-5 flex flex-wrap justify-center gap-3">
+                    <form method="POST" action="{{ route('admin.bundles.seed') }}">
+                        @csrf
+                        <button type="submit" class="btn-primary">
+                            Load Starter Catalog
+                        </button>
+                    </form>
+                    <button type="button" onclick="openNewBundleModal()" class="btn-secondary">
+                        + Create Bundle
+                    </button>
+                </div>
             </div>
         @endforelse
     </div>
@@ -123,4 +145,5 @@
         a bundle also deletes its papers, and is only possible while nothing has been sold — purchase records
         are permanent.
     </p>
+    @include('admin.partials.new-bundle-modal')
 @endsection

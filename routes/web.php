@@ -135,6 +135,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/', [AdminController::class, 'index'])->name('dashboard');
 
     Route::get('/bundles', [BundleAdminController::class, 'index'])->name('bundles');
+    Route::post('/bundles', [BundleAdminController::class, 'store'])->name('bundles.store');
+    Route::post('/bundles/seed', [BundleAdminController::class, 'seed'])->name('bundles.seed');
     Route::post('/bundles/{bundle}/status', [BundleAdminController::class, 'setStatus'])->name('bundles.status');
     Route::delete('/bundles/{bundle}', [BundleAdminController::class, 'destroy'])->name('bundles.destroy');
 

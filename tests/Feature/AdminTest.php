@@ -167,6 +167,36 @@ class AdminTest extends TestCase
         $this->assertDatabaseMissing('resources', ['bundle_id' => $this->bundle->id]);
     }
 
+    public function test_admin_can_create_a_bundle(): void
+    {
+        $response = $this->actingAs($this->admin)->post('/admin/bundles', [
+            'programme_name' => 'Nursing Science',
+            'course_code' => 'NURS 105',
+            'course_title' => 'Fundamentals of Nursing',
+            'level' => 100,
+            'academic_year' => '2024/2025',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('programmes', ['name' => 'Nursing Science']);
+        $this->assertDatabaseHas('courses', ['code' => 'NURS 105', 'title' => 'Fundamentals of Nursing']);
+        $this->assertDatabaseHas('bundles', [
+            'level' => 100,
+            'academic_year' => '2024/2025',
+            'status' => 'DRAFT',
+        ]);
+    }
+
+    public function test_admin_can_seed_default_catalog(): void
+    {
+        $response = $this->actingAs($this->admin)->post('/admin/bundles/seed');
+
+        $response->assertRedirect();
+        $response->assertSessionHas('status');
+        $this->assertDatabaseHas('programmes', ['slug' => 'accounting']);
+        $this->assertDatabaseHas('courses', ['code' => 'ACC 102']);
+    }
+
     // ── Paper management ─────────────────────────────────────────────
 
     public function test_paper_without_file_cannot_be_published(): void

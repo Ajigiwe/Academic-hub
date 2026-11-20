@@ -11,6 +11,34 @@
     </p>
 
     {{-- ── Upload ─────────────────────────────────────────────────── --}}
+    @php
+        $availableBundles = \App\Models\Bundle::with('course')->orderBy('title')->get();
+    @endphp
+
+    @if ($availableBundles->isEmpty())
+        <div class="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-5 dark:border-amber-900/60 dark:bg-amber-950/40">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-amber-950 dark:text-amber-100">No Bundles in Catalogue Yet</h3>
+                    <p class="mt-1 text-xs text-amber-900/80 dark:text-amber-300">
+                        In Academic Hub, past papers belong to a <strong>Bundle</strong> (course + academic year). Before uploading papers, you must have at least one bundle.
+                    </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 shrink-0">
+                    <form method="POST" action="{{ route('admin.bundles.seed') }}">
+                        @csrf
+                        <button type="submit" class="btn-primary btn-sm">
+                            Load Starter Catalog
+                        </button>
+                    </form>
+                    <button type="button" onclick="openNewBundleModal()" class="btn-secondary btn-sm">
+                        + Create Bundle
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <section class="card mt-5 overflow-hidden">
         <div class="border-b border-neutral-100 bg-neutral-50 px-5 py-4 dark:border-neutral-800 dark:bg-neutral-900">
             <h2 class="text-base font-semibold text-neutral-900 dark:text-white">Upload PDFs in bulk</h2>
@@ -22,14 +50,26 @@
         <form method="POST" action="{{ route('admin.papers.store') }}" enctype="multipart/form-data"
               class="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
             @csrf
-            <label>
-                <span class="label">Bundle</span>
-                <select name="bundle_id" required class="input text-sm">
-                    @foreach (\App\Models\Bundle::with('course')->orderBy('title')->get() as $b)
-                        <option value="{{ $b->id }}">{{ $b->course->code }} · {{ $b->academic_year }}</option>
-                    @endforeach
+            <div>
+                <div class="flex items-center justify-between">
+                    <span class="label">Bundle</span>
+                    <button type="button" onclick="openNewBundleModal()" class="text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline dark:text-brand-400">
+                        + New
+                    </button>
+                </div>
+                <select name="bundle_id" required class="input mt-1 w-full text-sm">
+                    @if ($availableBundles->isEmpty())
+                        <option value="" disabled selected>No bundles yet — click "+ New" above</option>
+                    @else
+                        <option value="" disabled {{ old('bundle_id') ? '' : 'selected' }}>Select a bundle...</option>
+                        @foreach ($availableBundles as $b)
+                            <option value="{{ $b->id }}" {{ old('bundle_id') == $b->id ? 'selected' : '' }}>
+                                {{ $b->course?->code ?? $b->title }} · {{ $b->academic_year }}
+                            </option>
+                        @endforeach
+                    @endif
                 </select>
-            </label>
+            </div>
             <label>
                 <span class="label">Title</span>
                 <input type="text" name="title" required placeholder="MKT 203 · Semester 2 Exam" class="input text-sm">
@@ -254,4 +294,5 @@
             });
         </script>
     @endpush
+    @include('admin.partials.new-bundle-modal')
 @endsection
