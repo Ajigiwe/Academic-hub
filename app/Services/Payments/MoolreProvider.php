@@ -237,8 +237,11 @@ class MoolreProvider implements PaymentProvider
      */
     public function verifySignature(string $rawBody, string $signature): bool
     {
-        $key = $this->configuredPrivateKey();
-        if ($key === '' || $signature === '') {
+        $webhookSecret = (string) config('payments.webhook_secret');
+        $privateKey = $this->configuredPrivateKey();
+        $keys = array_values(array_filter([$webhookSecret, $privateKey]));
+
+        if (empty($keys) || $signature === '') {
             return false;
         }
 
@@ -260,9 +263,20 @@ class MoolreProvider implements PaymentProvider
             }
         }
 
-        $expected = hash_hmac('sha256', $rawBody, $key);
+        foreach ($keys as $k) {
+            $expected = hash_hmac('sha256', $rawBody, $k);
+            if (hash_equals($expected, $hash)) {
+                return true;
+            }
+            if ($timestamp !== null) {
+                $expectedWithTime = hash_hmac('sha256', "{$timestamp}.{$rawBody}", $k);
+                if (hash_equals($expectedWithTime, $hash)) {
+                    return true;
+                }
+            }
+        }
 
-        return hash_equals($expected, $hash);
+        return false;
     }
 
     /**

@@ -17,7 +17,9 @@ return [
     // environment must set a real secret, otherwise the mock refuses
     // every delivery (and its routes 404) — that default is public, so a
     // forged payment.success could otherwise unlock content for free.
-    'webhook_secret' => env('PAYMENT_WEBHOOK_SECRET', MockProvider::DEV_SECRET),
+    // HMAC secret for webhooks. In Moolre, this is the Secret Key under
+    // Callback Information in the Moolre dashboard.
+    'webhook_secret' => env('PAYMENT_WEBHOOK_SECRET', '5fba4cb5-4696-46f8-af40-1d0a20dca58d'),
 
     // Extra hosts a student may return to after paying, on top of the
     // APP_URL host (comma-separated env list). Needed when the site is
@@ -30,8 +32,8 @@ return [
     ))),
 
     'moolre' => [
-        'public_key' => env('MOOLRE_PUBLIC_KEY', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyaWQiOjExMTUxNywid2FsbGV0aWQiOiI3ODU5NiIsImV4cCI6MTk1NjUyNzk5OX0.XoebPda86h4yplp426-G_xDThIDT74d8ruNGDCJHzlM'),
-        'private_key' => env('MOOLRE_PRIVATE_KEY', 'nx5mGtSLJ4iXRlRqoW3rTqG7C4sRqSUq3nJU9O5ppCiHo5b1rD8WDEOtawlqTGmt'),
+        'public_key' => env('MOOLRE_PUBLIC_KEY', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyaWQiOjExMTUxNywid2FsbGV0aWQiOiI3ODU5NiIsImV4cCI6MTk1NjU2NzU5OX0.XoebPda86h4yplp426-G_xDThIDT74d8ruNGDCJHzlM'),
+        'private_key' => env('MOOLRE_PRIVATE_KEY', 'lHIGquwg2NjLa9zpEIWM7oBZFtdbpA7fBQNujYHkVvMxcr5zeg9fdbh2w2pfXeDH'),
         'username' => env('MOOLRE_USERNAME', 'amgacademichub'),
         'account_number' => env('MOOLRE_ACCOUNT_NUMBER', '78596'),
         'base_url' => env('MOOLRE_BASE_URL', 'https://api.moolre.com'),
