@@ -111,11 +111,14 @@ class MoolreProvider implements PaymentProvider
         $webhookUrl = rtrim($origin, '/').'/payments/webhook';
 
         $payload = [
+            'state' => 'starter',
+            'accountnumber' => $this->accountNumber(),
+            'tx_source' => 'php-sdk',
             'type' => 1,
             'amount' => $amountGhs,
             'currency' => $currency === 'GHS' ? 'GHS' : $currency,
-            'accountnumber' => $this->accountNumber(),
             'email' => $customerEmail,
+            'reference' => $orderRef,
             'externalref' => $orderRef,
             'reusable' => '0',
             'callback' => $webhookUrl,
@@ -128,7 +131,11 @@ class MoolreProvider implements PaymentProvider
             ],
         ];
 
-        $response = $this->request('POST', '/embed/link', $payload);
+        try {
+            $response = $this->request('POST', '/embed/src/start', $payload);
+        } catch (\Throwable $e) {
+            $response = $this->request('POST', '/embed/link', $payload);
+        }
 
         $data = $response['data'] ?? [];
         if (($response['status'] ?? 0) !== 1 || empty($data['authorization_url'])) {
