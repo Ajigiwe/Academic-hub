@@ -34,26 +34,27 @@ class BundleAdminController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
             'programme_id' => ['nullable', 'integer', 'exists:programmes,id'],
             'programme_name' => ['nullable', 'string', 'max:120'],
-            'course_code' => ['required', 'string', 'max:30'],
-            'course_title' => ['required', 'string', 'max:255'],
             'level' => ['required', 'integer', 'in:100,200,300,400'],
-            'academic_year' => ['required', 'string', 'max:20'],
-            'title' => ['nullable', 'string', 'max:255'],
+            'course_code' => ['nullable', 'string', 'max:30'],
+            'academic_year' => ['nullable', 'string', 'max:20'],
             'description' => ['nullable', 'string'],
         ]);
 
-        // Resolve or create Programme
+        $title = trim($data['title']);
+
+        // 1. Resolve or create Programme
         $programme = null;
         if (!empty($data['programme_id'])) {
             $programme = Programme::find($data['programme_id']);
         }
         if (!$programme && !empty($data['programme_name'])) {
-            $name = trim($data['programme_name']);
+            $progName = trim($data['programme_name']);
             $programme = Programme::firstOrCreate(
-                ['name' => $name],
-                ['slug' => Str::slug($name)]
+                ['name' => $progName],
+                ['slug' => Str::slug($progName)]
             );
         }
         if (!$programme) {
@@ -63,26 +64,52 @@ class BundleAdminController extends Controller
             ]);
         }
 
-        // Resolve or create Course
-        $code = strtoupper(trim($data['course_code']));
-        $courseTitle = trim($data['course_title']);
+        // 2. Resolve or generate Course Code
+        $code = !empty($data['course_code']) ? strtoupper(trim($data['course_code'])) : null;
+        if (!$code) {
+            // Auto-generate code from title acronym (e.g. "Anatomy and Physiology" -> "AP 100")
+            $words = preg_split('/[\s\-_]+/', $title);
+            $initials = '';
+            foreach ($words as $w) {
+                if (!empty($w) && !in_array(strtolower($w), ['and', 'of', 'the', 'in', 'to', 'for', 'a', 'an'])) {
+                    $initials .= strtoupper($w[0]);
+                }
+            }
+            if (strlen($initials) < 2) {
+                $initials = strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $title), 0, 4));
+            }
+            if (empty($initials)) {
+                $initials = 'CRS';
+            }
+            $code = $initials . ' ' . $data['level'];
+        }
+
+        // Ensure unique course code
+        $baseCode = $code;
+        $cIndex = 1;
+        while (Course::where('code', $code)->where('title', '!=', $title)->exists()) {
+            $code = $baseCode . '-' . $cIndex;
+            $cIndex++;
+        }
+
         $course = Course::firstOrCreate(
-            ['code' => $code],
+            ['title' => $title],
             [
-                'title' => $courseTitle,
-                'slug' => Str::slug("{$code} {$courseTitle}"),
+                'code' => $code,
+                'slug' => Str::slug($title . '-' . Str::random(4)),
             ]
         );
 
-        $academicYear = trim($data['academic_year']);
+        // 3. Academic Year (defaults cleanly to current academic year)
+        $academicYear = !empty($data['academic_year'])
+            ? trim($data['academic_year'])
+            : (date('Y') . '/' . (date('Y') + 1));
+
         $level = (int) $data['level'];
 
-        $bundleTitle = !empty($data['title'])
-            ? trim($data['title'])
-            : "{$course->code} — {$course->title} · {$academicYear} Past Questions";
-
-        $baseSlug = Str::slug("{$course->code}-{$academicYear}");
-        $slug = $baseSlug;
+        // 4. Unique bundle slug
+        $baseSlug = Str::slug($title);
+        $slug = $baseSlug ?: 'bundle-' . Str::random(6);
         $counter = 1;
         while (Bundle::where('slug', $slug)->exists()) {
             $slug = "{$baseSlug}-{$counter}";
@@ -91,10 +118,10 @@ class BundleAdminController extends Controller
 
         $bundle = Bundle::create([
             'slug' => $slug,
-            'title' => $bundleTitle,
+            'title' => $title,
             'description' => !empty($data['description'])
                 ? trim($data['description'])
-                : "Past questions and study papers for {$course->code} ({$academicYear}).",
+                : "Past questions and study papers for {$title}.",
             'level' => $level,
             'academic_year' => $academicYear,
             'price_pesewas' => BundlePricing::pesewas(),
@@ -103,7 +130,7 @@ class BundleAdminController extends Controller
             'status' => 'DRAFT',
         ]);
 
-        return back()->with('status', "Bundle \"{$bundle->title}\" created. You can now attach papers to it.");
+        return back()->with('status', "Bundle \"{$bundle->title}\" created. You can now select it to upload papers.");
     }
 
     /**

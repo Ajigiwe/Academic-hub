@@ -171,18 +171,16 @@ class AdminTest extends TestCase
     {
         $response = $this->actingAs($this->admin)->post('/admin/bundles', [
             'programme_name' => 'Nursing Science',
-            'course_code' => 'NURS 105',
-            'course_title' => 'Fundamentals of Nursing',
+            'title' => 'Fundamentals of Nursing',
             'level' => 100,
-            'academic_year' => '2024/2025',
         ]);
 
         $response->assertRedirect();
         $this->assertDatabaseHas('programmes', ['name' => 'Nursing Science']);
-        $this->assertDatabaseHas('courses', ['code' => 'NURS 105', 'title' => 'Fundamentals of Nursing']);
+        $this->assertDatabaseHas('courses', ['title' => 'Fundamentals of Nursing']);
         $this->assertDatabaseHas('bundles', [
+            'title' => 'Fundamentals of Nursing',
             'level' => 100,
-            'academic_year' => '2024/2025',
             'status' => 'DRAFT',
         ]);
     }

@@ -64,7 +64,7 @@
                         <option value="" disabled {{ old('bundle_id') ? '' : 'selected' }}>Select a bundle...</option>
                         @foreach ($availableBundles as $b)
                             <option value="{{ $b->id }}" {{ old('bundle_id') == $b->id ? 'selected' : '' }}>
-                                {{ $b->course?->code ?? $b->title }} · {{ $b->academic_year }}
+                                {{ $b->title }}
                             </option>
                         @endforeach
                     @endif
