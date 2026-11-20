@@ -4,11 +4,26 @@
 
 @section('admin-content')
 @php use App\Support\Format; @endphp
-    <h1 class="text-xl font-bold text-neutral-900 dark:text-white">Papers</h1>
-    <p class="mt-1 max-w-3xl text-sm text-neutral-600 dark:text-neutral-400">
-        Papers live inside bundles — students buy one bundle per course and academic year, so upload PDFs
-        in bulk. Papers stay drafts until the bundle is published.
-    </p>
+    <div class="flex flex-wrap items-end justify-between gap-3">
+        <div class="min-w-0">
+            <h1 class="text-xl font-bold text-neutral-900 dark:text-white">Papers</h1>
+            <p class="mt-1 max-w-3xl text-sm text-neutral-600 dark:text-neutral-400">
+                Papers live inside bundles — students buy one bundle per course and academic year, so upload PDFs
+                in bulk. Papers stay drafts until the bundle is published.
+            </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <form method="POST" action="{{ route('admin.bundles.seed-procurement') }}" class="inline">
+                @csrf
+                <button type="submit" class="btn-secondary btn-sm" onclick="return confirm('Import/update Procurement & Supply past question bundles?')">
+                    Load Procurement Past Questions
+                </button>
+            </form>
+            <button type="button" onclick="openNewBundleModal()" class="btn-primary btn-sm">
+                + Create Bundle
+            </button>
+        </div>
+    </div>
 
     {{-- ── Upload ─────────────────────────────────────────────────── --}}
     @php

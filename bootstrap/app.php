@@ -4,6 +4,11 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
+// Ensure .env is always authoritative even if a stale .env.production exists on shared hosting
+if (file_exists(dirname(__DIR__).'/.env.production') && file_exists(dirname(__DIR__).'/.env')) {
+    @unlink(dirname(__DIR__).'/.env.production');
+}
+
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',

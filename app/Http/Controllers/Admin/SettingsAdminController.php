@@ -248,6 +248,11 @@ class SettingsAdminController extends Controller
      */
     public function clearConfigCache()
     {
+        // Remove stale .env.production if present so .env is the single source of truth
+        if (file_exists(base_path('.env.production'))) {
+            @unlink(base_path('.env.production'));
+        }
+
         $cachedConfig = app()->getCachedConfigPath();
 
         if (function_exists('opcache_invalidate') && file_exists($cachedConfig)) {

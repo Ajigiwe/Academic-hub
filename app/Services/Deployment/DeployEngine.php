@@ -389,7 +389,7 @@ class DeployEngine
                 }
             }
 
-            // Step 5: Database Migrations
+            // Step 5: Database Migrations & Catalogue Seeds
             if ($runMigrations) {
                 $log('STEP', "Running database migrations (artisan migrate --force)...");
                 $migProc = Process::path($this->basePath)->timeout(120)->run([$phpBin, 'artisan', 'migrate', '--force']);
@@ -399,6 +399,24 @@ class DeployEngine
                 if (!$migProc->successful()) {
                     throw new \RuntimeException("Artisan migrate failed:\n" . $migOut);
                 }
+
+                // Automatically load Procurement past questions catalogue
+                try {
+                    $procSeed = Process::path($this->basePath)->timeout(120)->run([$phpBin, 'artisan', 'db:seed', '--class=Database\\Seeders\\ProcurementSeeder', '--force']);
+                    if ($procSeed->successful()) {
+                        $log('SUCCESS', "Procurement & Supply past questions catalog loaded.");
+                    } else {
+                        $seedOut = trim($procSeed->output() . ' ' . $procSeed->errorOutput());
+                        $log('INFO', "Procurement seeder: " . ($seedOut ? substr($seedOut, -300) : 'Done'));
+                    }
+                } catch (\Throwable $se) {
+                    $log('WARN', "Procurement seed skipped: " . $se->getMessage());
+                }
+            }
+
+            // Remove stale .env.production if it exists so .env is the single source of truth
+            if (file_exists($this->basePath . DIRECTORY_SEPARATOR . '.env.production')) {
+                @unlink($this->basePath . DIRECTORY_SEPARATOR . '.env.production');
             }
 
             // Step 6: Optimizing Caches

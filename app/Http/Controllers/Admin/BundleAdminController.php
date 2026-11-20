@@ -134,7 +134,7 @@ class BundleAdminController extends Controller
     }
 
     /**
-     * Populate starter courses and bundles from PastqSeeder.
+     * Populate starter courses and bundles from PastqSeeder and ProcurementSeeder.
      */
     public function seed()
     {
@@ -142,8 +142,25 @@ class BundleAdminController extends Controller
             '--class' => 'Database\\Seeders\\PastqSeeder',
             '--force' => true,
         ]);
+        Artisan::call('db:seed', [
+            '--class' => 'Database\\Seeders\\ProcurementSeeder',
+            '--force' => true,
+        ]);
 
-        return back()->with('status', 'Starter courses and bundles have been loaded successfully into the catalogue.');
+        return back()->with('status', 'Starter catalogue and Procurement past questions have been loaded successfully.');
+    }
+
+    /**
+     * Import Procurement & Supply past question bundles and papers.
+     */
+    public function seedProcurement()
+    {
+        Artisan::call('db:seed', [
+            '--class' => 'Database\\Seeders\\ProcurementSeeder',
+            '--force' => true,
+        ]);
+
+        return back()->with('status', 'Procurement & Supply past questions (16 papers across 15 bundles) loaded successfully.');
     }
 
     /**

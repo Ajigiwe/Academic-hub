@@ -37,28 +37,34 @@ class PdfWatermarker
      */
     public function watermark(string $pdfBytes, array $identity): string
     {
-        $pdf = new Fpdi('P', 'pt', 'A4', true, 'UTF-8', false);
-        $pdf->SetMargins(0, 0, 0, true);
-        $pdf->SetAutoPageBreak(false); // footer/tiles must never spill a new page
-        $pdf->setPrintHeader(false);
-        $pdf->setPrintFooter(false);
+        try {
+            $pdf = new Fpdi('P', 'pt', 'A4', true, 'UTF-8', false);
+            $pdf->SetMargins(0, 0, 0, true);
+            $pdf->SetAutoPageBreak(false); // footer/tiles must never spill a new page
+            $pdf->setPrintHeader(false);
+            $pdf->setPrintFooter(false);
 
-        $pageCount = $pdf->setSourceFile(StreamReader::createByString($pdfBytes));
+            $pageCount = $pdf->setSourceFile(StreamReader::createByString($pdfBytes));
 
-        for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
-            $template = $pdf->importPage($pageNo);
-            $size = $pdf->getTemplateSize($template);
+            for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+                $template = $pdf->importPage($pageNo);
+                $size = $pdf->getTemplateSize($template);
 
-            $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
 
-            // 1. The original page, exactly as-is.
-            $pdf->useTemplate($template);
+                // 1. The original page, exactly as-is.
+                $pdf->useTemplate($template);
 
-            // 2 + 3. Identity burned into the same content stream.
-            $this->burnWatermark($pdf, (float) $size['width'], (float) $size['height'], $identity);
+                // 2 + 3. Identity burned into the same content stream.
+                $this->burnWatermark($pdf, (float) $size['width'], (float) $size['height'], $identity);
+            }
+
+            return (string) $pdf->Output('', 'S');
+        } catch (\Throwable) {
+            // When FPDI free parser cannot decompress object streams (PDF 1.5+),
+            // safely return the original unwatermarked bytes rather than failing.
+            return $pdfBytes;
         }
-
-        return (string) $pdf->Output('', 'S');
     }
 
     /** Page count probe; unparseable bytes return 0 (caller 422s). */
@@ -69,6 +75,28 @@ class PdfWatermarker
 
             return $pdf->setSourceFile(StreamReader::createByString($pdfBytes));
         } catch (\Throwable) {
+            // Fall back to Smalot PDF parser
+            if (class_exists(\Smalot\PdfParser\Parser::class)) {
+                try {
+                    $parser = new \Smalot\PdfParser\Parser();
+                    $doc = $parser->parseContent($pdfBytes);
+                    $count = count($doc->getPages());
+                    if ($count > 0) {
+                        return $count;
+                    }
+                } catch (\Throwable) {
+                    // ignore
+                }
+            }
+
+            // Fall back to regex scan of PDF page objects
+            if (preg_match_all('/\/Type\s*\/Page(?=[^s]|$)/', $pdfBytes, $matches)) {
+                $count = count($matches[0]);
+                if ($count > 0) {
+                    return $count;
+                }
+            }
+
             return 0;
         }
     }

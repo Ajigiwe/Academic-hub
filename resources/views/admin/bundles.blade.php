@@ -22,6 +22,12 @@
                     </button>
                 </form>
             @endif
+            <form method="POST" action="{{ route('admin.bundles.seed-procurement') }}" class="inline">
+                @csrf
+                <button type="submit" class="btn-secondary btn-sm" onclick="return confirm('Import/update Procurement & Supply past question bundles?')">
+                    Load Procurement Past Questions
+                </button>
+            </form>
             <button type="button" onclick="openNewBundleModal()" class="btn-primary btn-sm">
                 + Create Bundle
             </button>
